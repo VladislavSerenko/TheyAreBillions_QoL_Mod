@@ -192,20 +192,6 @@ not established. The UI added by this version is in English.
 
 ## Share on GitHub
 
-Publish this source directory as its own repository and attach the generated
-release ZIP to a GitHub release. `bin`, `obj`, `artifacts`, native saves and game
-executables are ignored by Git. Never upload your game installation, backups,
-logs or save files. If using the source ZIP, extract it and create a repository:
-
-```powershell
-git init -b main
-git add .
-git commit -m 'Initial TAB QoL release'
-```
-
-Create an empty GitHub repository, add its remote and push `main`. The included
-GitHub Actions workflow builds and tests without any proprietary game files.
-
 Original mod code: [MIT](LICENSE). Bundled libraries:
 [third-party notices](THIRD-PARTY-NOTICES.md). Unofficial; not affiliated with the
 game's developers or publishers. No game code or assets are distributed.
