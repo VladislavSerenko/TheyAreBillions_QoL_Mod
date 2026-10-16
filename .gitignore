@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+artifacts/
+.vs/
+*.user
+*.zxsav
+*.zxcampaign
+*.zxcheck
+*.zxuser
+TheyAreBillions*.exe
+*.original
+*.log

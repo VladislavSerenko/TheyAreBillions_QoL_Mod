@@ -1,0 +1,20 @@
+name: Build and test
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build, test and package
+        shell: powershell
+        run: .\Build.ps1 -Package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TABQoL-0.2.1
+          path: artifacts/TABQoL-0.2.1.zip
+          if-no-files-found: error
