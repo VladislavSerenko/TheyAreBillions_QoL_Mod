@@ -7,34 +7,40 @@ reset, optional hero mission skipping with full rewards, and adjustable
 simulation speed, building hotkeys and an F12 debug cheat panel. It patches
 your own installed game locally.
 
-## Supported version
+## Supported versions
 
-**They Are Billions 1.1.4.10, GOG, x64** only. The original
-`TheyAreBillions.exe` must have this SHA-256:
+The 0.3.0 candidate targets **Steam and GOG x64**. Native Steam verification is
+pending; see [validation status](VALIDATION.md). The installer detects the edition
+from the original `TheyAreBillions.exe` SHA-256:
 
 ```text
+GOG 1.1.4.10:
 f502e38dd6840a5d52331c1c8d68ab94c79f620e2dd5453e9bf5168d909433d3
+Steam (EXE file version 1.0.14.29):
+695cef4ad913f9ffd1f9f0508d26862546b130922db53dce716051fe9b0a9d2d
 ```
 
-The installer rejects other versions and modified executables. Steam, x86 and
-other builds are currently unsupported, even if their displayed version matches.
+The installer rejects other versions, x86 and modified executables, even if
+their displayed version matches. Steam updates may require a new adapter.
 Requires Windows and .NET Framework 4.6.2 or newer. The game must already run
 normally with its own dependencies installed.
 
 ## Install
 
-1. Close the game. Extract `TABQoL-0.2.1.zip` into a separate folder.
+1. Close the game. Extract `TABQoL-0.3.0.zip` into a separate folder.
 2. Open PowerShell in the extracted folder and run:
 
    ```powershell
-   .\TABQoL.Installer.exe inspect 'C:\Games\They Are Billions'
-   .\Install.ps1 -GameDirectory 'C:\Games\They Are Billions'
+   .\TABQoL.Installer.exe inspect 'C:\Games\Steam\steamapps\common\They Are Billions'
+   .\Install.ps1 -GameDirectory 'C:\Games\Steam\steamapps\common\They Are Billions'
    ```
 
+   For GOG, use its directory, for example `C:\Games\They Are Billions`.
    You can also invoke `TABQoL.Installer.exe install '<game-directory>'` directly.
    Administrator privileges are needed only if Windows requires them to write
    to your game directory.
-3. Launch the game normally. Open **Options > TAB QoL** or press **F10**.
+3. Launch the game normally (through Steam for the Steam edition). Open
+   **Options > TAB QoL** or press **F11**.
 
 The installer backs up the original EXE and user save files before replacing
 the executable. Keep `TABQoL.Installation` in the game directory for uninstall.
@@ -48,7 +54,7 @@ To upgrade, uninstall the previous version before installing the new version.
 | Quick load | F9 |
 | Slower | `[` |
 | Faster | `]` |
-| QoL menu | F10 |
+| QoL menu | F11 |
 | Debug cheat panel | F12 |
 
 Change keys and choose **0.5×, 1×, 2×, 3×, 4× or 5×** in **Options > TAB QoL**.
@@ -57,11 +63,16 @@ be unique. Enter, Escape, Windows and modifier keys cannot be assigned. Choose
 keys that do not conflict with your native game bindings. The bracket defaults
 refer to the physical Windows OEM bracket keys; printed characters vary with
 keyboard layout. Settings apply immediately and persist between sessions.
+The previous default F10 is migrated to F11 to avoid the game's image capture
+action. Custom menu bindings are preserved. The mod consumes its assigned keys
+before native special actions, including the game's F11 developer action.
 
 ### Mission saves
 
-F5/F9 use the quick slot. **F10 > Save / Load** provides that slot and five
-manual slots. Slots are separate for each game and campaign mission. Resume
+F5/F9 use the quick slot. **F11 > Save / Load** provides that slot and **ten
+manual slots** across two pages, plus a separate **Autosaves** page with five
+rotating slots. Save and Load buttons are grouped beside each row.
+Slots are separate for each edition, game and campaign mission. Resume
 that mission through the normal game menu before loading one of its mod slots.
 Saving captures the native colony and campaign state while briefly pausing the
 simulation. Loading restores the entire snapshot, including resources, units
@@ -69,25 +80,35 @@ and campaign points.
 
 Saving is available in a loaded, ongoing mission, including while paused.
 Wait for loading/transitions to finish. Close other dialogs before using
-mission hotkeys. Loading also works through F10 while a finished mission is
+mission hotkeys. Loading also works through F11 while a finished mission is
 still loaded, including from its result screen. The world map cannot use slots.
 Snapshots remain separate from the game's ordinary saves. Each slot retains
 its current and previous generation; SHA-256 hashes are checked before loading.
 Slots from completed/abandoned games remain on disk until you remove them.
 
+Autosave defaults to **every 10 minutes of active real play**. In
+**Options > TAB QoL**, choose Off or an interval from 1 to 1440 minutes.
+Paused time, modal menus and loading do not count; game speed does not change
+the interval. Five slots retain the last five autosaves (about 50 minutes at
+the default interval). The oldest is replaced next. Quick/manual saves are
+independent. The timer restarts after a mission load or interval change;
+missed saves during a long suspension are not queued.
+
 ### Building hotkeys
 
-Select your command center and open a construction category, then press the
-letter displayed on a building button. **T** builds a tent in the Colonists
-category. Other defaults follow the command grid. Keys work in the current
-category, and preserve native unlock, resource and placement requirements.
-Unit orders keep their normal bindings when the construction menu is closed.
+Select a player building and use **Q W E R T** for its top command row,
+**A S D F G** for the middle row, and **Z X C V B** for the bottom row.
+This includes command-center construction categories, individual buildings,
+barracks recruitment and other building commands. The default tent key is Q.
+Visible hints follow the current command grid. Native unlock, resource, queue
+and placement requirements still apply. Unit selections keep their native keys.
 
-Open **F10 > Building hotkeys** or **Options > TAB QoL > Building hotkeys** to
+Open **F11 > Building hotkeys** or **Options > TAB QoL > Building hotkeys** to
 change each building key. Assign A–Z, Backspace to unbind, or Escape to cancel.
 Use different keys within a category; different categories may reuse a key.
 Building keys cannot overlap the mod's global hotkeys. Shift/Ctrl/Alt/Windows
 combinations do not activate construction shortcuts. Bindings persist in XML.
+Existing custom construction keys override the grid defaults.
 
 ### Debug cheats
 
@@ -101,7 +122,7 @@ or changing missions. They are not stored in settings or snapshots.
 **Win current mission...** asks for confirmation inside the game, saves a
 separate `before-cheat-win` snapshot, then runs the native victory sequence.
 Finish the normal result screen to apply campaign progress and rewards.
-To undo before leaving that screen, open **F10 > Save / Load** and load the
+To undo before leaving that screen, open **F11 > Save / Load** and load the
 `before-cheat-win` row. Saving a finished mission is unavailable.
 The debug win does not grant uncollected hero loot; the campaign's optional
 hero skip checkbox still provides maximum rewards. Resource, health and
@@ -179,11 +200,16 @@ On Windows with the .NET SDK 8 or newer:
 .\Build.ps1 -Package -OriginalExe 'C:\path\to\original\TheyAreBillions.exe'
 ```
 
-The release ZIP is written to `artifacts`. NuGet restores Mono.Cecil 0.11.6 and
+The release ZIP is written to `artifacts`. NuGet restores dnlib 4.5.0 and
 .NET Framework reference assemblies. No game assemblies are required to compile.
 Automated checks cover settings, speed stepping, slot isolation/retention,
 checksum rejection and interrupted writes. With `-OriginalExe`, they also patch
-a temporary copy, verify all eight hook names and reject double patching.
+a temporary copy, preserve original metadata token identities, verify all nine
+hook names and reject double patching. Supply multiple paths to test both editions:
+
+```powershell
+.\Build.ps1 -OriginalExe @('C:\GOG-original\TheyAreBillions.exe', 'C:\Steam-original\TheyAreBillions.exe')
+```
 
 Local game integration checks use isolated campaign copies. See
 [VALIDATION.md](VALIDATION.md) for the tested scope and remaining limits. High

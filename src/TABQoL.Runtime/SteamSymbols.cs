@@ -1,0 +1,67 @@
+using System.Collections.Generic;
+
+namespace TABQoL
+{
+    // Exact-build symbol aliases only; no game implementation or assets.
+    internal static class SteamSymbols
+    {
+        internal static readonly Dictionary<string, string> Names = new Dictionary<string, string>
+        {
+            { "#=zBmnjUnslgJaG", "#=zM3nhRXPdWdhx" },
+            { "#=z_F7azNTGCKsjCnAtcA==", "#=zMtGuEM2lBSlZ5BGWvg==" },
+            { "#=z_h2KT87115r3IrwOlA==", "#=z5Ns_eH8ENLF7HFU5mg==" },
+            { "#=z05IuJj__BbzYhHsjMg==", "#=zFpgaOrgqHAzLKPVeVw==" },
+            { "#=z1bNOp4aWqr$i", "#=zQXHqcVh9mGZZ" },
+            { "#=z2HYRuV6sRpY0bjMRbA==", "#=zyMMweQL9LzVp8ZCJ7w==" },
+            { "#=z3haDTI8sX6l1GHJNaQ==", "#=zLs$VX1eoAapVflmW_w==" },
+            { "#=z4Ujn8qYHIFdBdIolpwTd9QjoX5RMukwwvw==", "#=zUP3fNT91wdeRZ01A8uJGGeZjpeUPYcB71A==" },
+            { "#=z7HoVskmyZLzk", "#=z1tQEbFB9gJlB" },
+            { "#=z87KhQl1b3Apo", "#=zIoSB3Q$9ZjUF" },
+            { "#=z8OaGcNk=", "#=zhWLC3K8=" },
+            { "#=z9MozRH4=", "#=zyruJg$0=" },
+            { "#=z9SDftOMfXc1$", "#=zi4nTn5pLODUq" },
+            { "#=zAiew5ms=", "#=ztZHhvew=" },
+            { "#=zazFoTtSyIlJm", "#=zwK_pUIeRBpbp" },
+            { "#=zC92uNhZ_knxtSrhV$Q==", "#=z0Sr9rLFliE7AcEoyTw==" },
+            { "#=zcuweyrXwy2ww6VmBwA==", "#=zzi2cl4h1HYA5cX8aaw==" },
+            { "#=zDB6tDoo=", "#=zCj$vlp8=" },
+            { "#=zDWKQa9iNgGJZwrF26g==", "#=z4RevDP3eECXqXS6JRA==" },
+            { "#=zdXhkDGBAxYZXiuzHeg==", "#=z9IpK6P4YlW8GIY7olg==" },
+            { "#=ze3cy7Z0=", "#=zR1qHCYY=" },
+            { "#=zEb$WviU=", "#=zRIE20Dk=" },
+            { "#=zecoAwxI00vS7vQao43Sgb4AXv8bq2eHvtg==", "#=zifok0BN8G1$f0Bbx0zViJCxVzYSoy47egw==" },
+            { "#=zEHnEwyMK7mIMOOClaw==", "#=zefLbEQj3ugNnpskJ_w==" },
+            { "#=zELX0oyIBb7sj", "#=zphg$7T0x0GWi" },
+            { "#=zG9K55tU=", "#=zXdArBkQ=" },
+            { "#=zgTbz09XqLxYj+#=zz8951q8=", "#=z4ztojdHuH9At+#=zrtNti8Q=" },
+            { "#=ziNsk$boUig7O1vdvxCL5nEdEqOZ_", "#=zeXRmw5tIP471pEjGC5baxF$crPSL" },
+            { "#=zizPJBb5xp65J", "#=zn_hO_SVAE4k8" },
+            { "#=zjpIhLbTrXdTk", "#=zSV0_oCta8rEv" },
+            { "#=zJZkqJ1c=", "#=zePbLN$s=" },
+            { "#=zK$ZAIPBoZfgY", "#=z4cHfUtNBoiM8" },
+            { "#=zKKcS4uw=", "#=zuartwoo=" },
+            { "#=zl_ZGp3jyTOIKGT0_gw==", "#=zivoMsCBKlIGsvjTGug==" },
+            { "#=zlFNeqMQ=", "#=zsquEtAA=" },
+            { "#=zLMShEFC9jpaO4VPMB0gqR_U=", "#=zbkVHqZ9cKv04ViPqdDFWadE=" },
+            { "#=zPfDvqoE=", "#=z2SXmL2Q=" },
+            { "#=zPvzf4cLsz8Wu48qHBQ==", "#=zrP3F5pMF_YpL4hPZKg==" },
+            { "#=zQ1MBZhUM4_4jdcUhz7H1E3NGPwuC", "#=zDB$fZzE4fVJzNeDCt$4XVmDIV3Ul" },
+            { "#=zQA96tlNNErChKjVzAa3pMCo=", "#=ziRTRjxBam3nts2VYcZF8kKw=" },
+            { "#=zQcFqp7YsrFgY", "#=zS6TvFuwF_68l" },
+            { "#=zqWh9dpSyGP7V", "#=zHeTjjvJqXJ3w" },
+            { "#=zqZKzsA47yWa6+#=zz8951q8=", "#=zqZKzsA47yWa6+#=zrtNti8Q=" },
+            { "#=zrkMXvYMLBXvSpF4_wXnuWWSJBi98", "#=zUsJtyOzSfYDnqdeHjCSzszBbekLj" },
+            { "#=zrkMXvYMLBXvSpF4_wXnuWWSJBi98+<>c__DisplayClass64_0", "#=zUsJtyOzSfYDnqdeHjCSzszBbekLj+<>c__DisplayClass64_0" },
+            { "#=zrkMXvYMLBXvSpF4_wXnuWWSJBi98+OMission", "#=zUsJtyOzSfYDnqdeHjCSzszBbekLj+OMission" },
+            { "#=zSz0PIPoe$1bzpCj9VL55$uw=", "#=zxRcpu6e7NYzT7tGWqPjpOkc=" },
+            { "#=zUJOmG7a78H0A", "#=zg10wm6mM9hhx" },
+            { "#=zUKXJUrJtBsnw", "#=z6xYjFJ9HYPBB" },
+            { "#=zvT_u6MS_DQf7qXj2nQ==", "#=z3YFOTVtBw_rT7oSQRA==" },
+            { "#=zwjLekNY=", "#=zThX9FxI=" },
+            { "#=zXNSl029mPMOY6Jn_Ng==", "#=zND5ul2zfzAnWdSnC0A==" },
+            { "#=zY2B0_ig=", "#=z4yC0bbg=" },
+            { "#=zZFf9lzN32EUS", "#=zW8rBd78cY2uD" },
+            { "#=zZyz8m9Pgfwvf", "#=zsW2J3r72Cu83" },
+        };
+    }
+}

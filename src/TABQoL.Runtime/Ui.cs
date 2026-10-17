@@ -87,41 +87,55 @@ namespace TABQoL
         internal static void OpenMenu()
         {
             if (windows.Count > 0) { CloseModWindows(); return; }
-            var window = Window("TAB QoL");
+            var window = Window("TAB QoL", true);
             var content = Reflect.Get(window, "OContent");
             float width = (float)Reflect.Get(content, "Width");
-            Button(content, "Save / Load", 0, 0, width, () => OpenSlots());
-            Button(content, "Speed & hotkeys", 0, 48 * Unit, width, () => OpenSettings());
-            Button(content, "Reset technologies", 0, 96 * Unit, width, ConfirmReset);
-            Button(content, "Building hotkeys", 0, 144 * Unit, width, () => OpenBuildingKeys());
-            Button(content, "Debug cheats", 0, 192 * Unit, width, OpenCheats);
-            Add(content, Label("F5: quick save    F9: quick load    [ / ]: speed\nF10: this menu    F12: debug cheats (default keys)", width), 0, 248 * Unit, width, 80 * Unit);
+            MetalButton(content, "Save / Load", 0, 0, width, () => OpenSlots());
+            MetalButton(content, "Speed & hotkeys", 0, 58 * Unit, width, () => OpenSettings());
+            MetalButton(content, "Reset technologies", 0, 116 * Unit, width, ConfirmReset);
+            MetalButton(content, "Building hotkeys", 0, 174 * Unit, width, () => OpenBuildingKeys());
+            MetalButton(content, "Debug cheats", 0, 232 * Unit, width, OpenCheats);
+            Add(content, Label("F5: quick save    F9: quick load    [ / ]: speed\nF11: this menu    F12: debug cheats (default keys)", width), 0, 294 * Unit, width, 60 * Unit);
             Show(window);
         }
 
-        internal static void OpenSlots()
+        internal static void OpenSlots(int page = 0)
         {
             Bridge.RequireLoadedMission();
-            var window = Window("Save / Load - current mission");
+            CloseModWindows();
+            var window = Window("Save / Load - " + (page == 2 ? "Autosaves" : "Manual " + (page + 1) + " / 2"));
             var content = Reflect.Get(window, "OContent");
             float width = (float)Reflect.Get(content, "Width");
             string scope = Bridge.Scope();
-            var slots = new[] { "quick", "slot1", "slot2", "slot3", "slot4", "slot5", "before-cheat-win" };
+            float u = Unit;
+            for (int tab = 0; tab < 3; tab++)
+            {
+                int target = tab;
+                MetalButton(content, new[] { "Manual 1 - 5", "Manual 6 - 10", "Autosaves" }[tab], tab * width / 3, 0, width / 3, () => OpenSlots(target));
+            }
+            var slots = page == 2 ? Enumerable.Range(1, 5).Select(i => "autosave" + i).ToArray() :
+                new[] { "quick" }.Concat(Enumerable.Range(page * 5 + 1, 5).Select(i => "slot" + i)).Concat(new[] { "before-cheat-win" }).ToArray();
+            var sample = Reflect.New("ZX.GUI.ZXButtonSteam", "Save", null);
+            float buttonWidth = (float)Reflect.Get(sample, "Width");
+            float groupX = width - buttonWidth * 2 - 6 * u;
             for (int i = 0; i < slots.Length; i++)
             {
                 string slot = slots[i];
                 var snapshot = Bridge.Store.Read(scope, slot);
                 string caption = slot + (snapshot == null ? " (empty)" : "  " + snapshot.CreatedUtc.ToLocalTime().ToString("g"));
-                float y = i * 48 * Unit;
-                var label = Label(caption, width * 0.52f);
-                Add(content, label, 0, y, width * 0.52f, 40 * Unit);
-                Button(content, "Save", width * 0.55f, y, width * 0.2f, () =>
+                float y = (60 + i * 52) * u;
+                var label = Label(caption, groupX - 8 * u);
+                Add(content, label, 0, y + 9 * u, groupX - 8 * u, 40 * u);
+                var load = MetalButton(content, "Load", groupX + buttonWidth + 6 * u, y, buttonWidth, () => Bridge.Load(slot));
+                Reflect.Set(load, "Enabled", snapshot != null);
+                if (page != 2 && slot != "before-cheat-win") MetalButton(content, "Save", groupX, y, buttonWidth, () =>
                 {
                     Bridge.Save(slot);
                     Reflect.Set(label, "Text", slot + "  " + DateTime.Now.ToString("g"));
+                    Reflect.Set(load, "Enabled", true);
                 });
-                Button(content, "Load", width * 0.78f, y, width * 0.2f, () => Bridge.Load(slot));
             }
+            if (page == 2) Add(content, Label("Five rotating autosaves. Interval: " + (Bridge.Config.AutosaveMinutes == 0 ? "off" : Bridge.Config.AutosaveMinutes + " min of active play") + ".\nChange the interval in Options > TAB QoL.", width), 0, 334 * u, width, 60 * u);
             Show(window);
         }
 
@@ -155,7 +169,7 @@ namespace TABQoL
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
-                float y = (52 + i * 42) * u;
+                float y = (46 + i * 38) * u;
                 Add(content, Label(names[i], width * 0.48f), 0, y, width * 0.48f, 34 * u);
                 object button = null;
                 button = Button(content, KeyName(getters[i]()), width * 0.5f, y, width * 0.48f, () =>
@@ -178,10 +192,22 @@ namespace TABQoL
                     };
                 });
             }
-            Button(content, "Building hotkeys", 0, 314 * u, width * 0.48f, () => OpenBuildingKeys());
-            Button(content, "Debug cheats", width * 0.5f, 314 * u, width * 0.48f, OpenCheats);
-            Button(content, "Save / Load", 0, 358 * u, width * 0.48f, OpenSlots);
-            Button(content, "Reset technologies", width * 0.5f, 358 * u, width * 0.48f, ConfirmReset);
+            Add(content, Label("Autosave interval (active play)", width * 0.48f), 0, 280 * u, width * 0.48f, 34 * u);
+            var autosaveBox = Reflect.New("ZX.GUI.ZXComboBox");
+            Reflect.Set(autosaveBox, "Items", Enumerable.Range(0, 1441).Select(m => m == 0 ? "Off" : m + " min").ToList());
+            Reflect.Set(autosaveBox, "SelectedIndex", Bridge.Config.AutosaveMinutes);
+            Add(content, autosaveBox, width * 0.5f, 280 * u, width * 0.48f, 34 * u);
+            Reflect.Event(autosaveBox, "SelectedIndexChanged", _ => Bridge.Run(() =>
+            {
+                int previous = Bridge.Config.AutosaveMinutes;
+                Bridge.Config.AutosaveMinutes = (int)Reflect.Get(autosaveBox, "SelectedIndex");
+                try { Bridge.PersistSettings(); }
+                catch { Bridge.Config.AutosaveMinutes = previous; throw; }
+            }));
+            MetalButton(content, "Building hotkeys", 0, 332 * u, width * 0.5f, () => OpenBuildingKeys());
+            MetalButton(content, "Debug cheats", width * 0.5f, 332 * u, width * 0.5f, OpenCheats);
+            MetalButton(content, "Save / Load", 0, 390 * u, width * 0.5f, () => OpenSlots());
+            MetalButton(content, "Reset technologies", width * 0.5f, 390 * u, width * 0.5f, ConfirmReset);
         }
 
         private static string KeyName(int key)
@@ -284,8 +310,8 @@ namespace TABQoL
             var tabArea = (RectangleF)Reflect.Get(firstTab, "Area");
             worldControls = Reflect.New("DXVision.DXObject");
             Reflect.Set(worldControls, "ID", "TABQoL.WorldControls");
-            Reflect.Set(worldControls, "Size", new SizeF(64 * u, 82 * u));
-            Reflect.Set(worldControls, "Location", new PointF(tabArea.Left - 78 * u, tabArea.Top + (tabArea.Height - 64 * u) / 2));
+            Reflect.Set(worldControls, "Size", new SizeF(64 * u, 64 * u));
+            Reflect.Set(worldControls, "Location", new PointF(tabArea.Left - 102 * u, tabArea.Top + (tabArea.Height - 64 * u) / 2));
             Reflect.Set(worldControls, "Z", 1000000);
             var frame = Reflect.New("DXVision.DXObject");
             Reflect.Set(frame, "Z", -1);
@@ -300,11 +326,6 @@ namespace TABQoL
             Reflect.Set(button, "Tag", Reflect.New("ZX.ZXHelp", "TAB QoL", "Campaign options, research reset and mod settings.", null, null, null, null));
             Add(worldControls, button, 8 * u, 8 * u, 48 * u, 48 * u);
             Reflect.Event(button, "Activated", _ => Bridge.Queue(OpenCampaignOptions));
-            var font = Reflect.Call(Reflect.Call(Reflect.Type(Compatibility.Fonts), Compatibility.BodyFont), "Clone");
-            Reflect.Set(font, "TextAlign", ContentAlignment.MiddleCenter);
-            Reflect.Call(font, "Scale", 0.85f);
-            var caption = Reflect.Call(font, "CreateObject", "QoL", 64 * u);
-            Add(worldControls, caption, 0, 61 * u, 64 * u, 20 * u);
             Reflect.Call(Reflect.Get(firstTab, "Parent"), "AddObject", worldControls);
         }
 
@@ -314,23 +335,29 @@ namespace TABQoL
             var window = Window("TAB QoL - Campaign", true);
             var content = Reflect.Get(window, "OContent");
             float width = (float)Reflect.Get(content, "Width"), u = Unit;
-            Check(content, "Skip hero missions (all rewards)", 4 * u, width, Bridge.Config.SkipHeroMissions, value =>
+            CampaignButton(content, "Reset technologies", 0, width, ConfirmReset);
+            CampaignButton(content, "Mod settings", 58 * u, width, OpenSettings);
+            Check(content, "Skip hero missions (all rewards)", 138 * u, width, Bridge.Config.SkipHeroMissions, value =>
             {
                 Bridge.Config.SkipHeroMissions = value;
                 Bridge.PersistSettings();
             });
-            CampaignButton(content, "Reset technologies", 52 * u, width, ConfirmReset);
-            CampaignButton(content, "Mod settings", 110 * u, width, OpenSettings);
             Show(window);
         }
 
         private static void CampaignButton(object content, string text, float y, float width, Action action)
         {
+            MetalButton(content, text, 0, y, width, action);
+        }
+
+        private static object MetalButton(object content, string text, float x, float y, float width, Action action)
+        {
             var button = Reflect.New("ZX.GUI.ZXButtonSteam", text, null);
             Reflect.Set(button, "UseSmallFontStyle", true);
-            Reflect.Set(button, "Location", new PointF((width - (float)Reflect.Get(button, "Width")) / 2, y));
+            Reflect.Set(button, "Location", new PointF(x + (width - (float)Reflect.Get(button, "Width")) / 2, y));
             Reflect.Call(content, "AddObject", button);
             Reflect.Event(button, "Activated", _ => Bridge.Queue(action));
+            return button;
         }
 
         internal static void RemoveWorldControls()

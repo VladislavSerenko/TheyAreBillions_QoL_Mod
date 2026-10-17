@@ -45,7 +45,24 @@ internal static class Program
             Check(!Settings.BindableKey(16) && !Settings.BindableKey(162) && !Settings.BindableKey(91) && Settings.BindableKey(117), "modifier/Windows keys rejected and ordinary function keys accepted");
             File.WriteAllText(settingsPath, "<Settings><Speed>2</Speed><MenuKey>121</MenuKey></Settings>");
             settings = Settings.Read(settingsPath);
-            Check(settings.CheatsKey == 123 && settings.BuildingKeys.Count == 0 && settings.Speed == 2, "0.1 settings migrate with F12 and default building keys");
+            Check(settings.CheatsKey == 123 && settings.MenuKey == 122 && settings.AutosaveMinutes == 10 && settings.BuildingKeys.Count == 0 && settings.Speed == 2, "old defaults migrate to F11 and ten-minute autosaves");
+            File.WriteAllText(settingsPath, "<Settings><MenuKey>117</MenuKey><Speed>1</Speed></Settings>");
+            Check(Settings.Read(settingsPath).MenuKey == 117, "custom menu binding survives migration");
+            Check(Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = -1 }.Validate()) &&
+                Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = 1441 }.Validate()), "autosave interval bounds enforced");
+            Check(Policy.GridKey(1) == 'Q' && Policy.GridKey(2) == 'W' && Policy.GridKey(5) == 'T' && Policy.GridKey(6) == 'A' && Policy.GridKey(15) == 'B' && Policy.GridKey(0) == 0, "command grid follows QWERT, ASDFG, ZXCVB");
+            var schedule = new AutosaveSchedule();
+            Check(!schedule.Tick(0, true, 1), "autosave does not fire immediately");
+            for (int second = 1; second < 30; second++) schedule.Tick(second, true, 1);
+            for (int second = 30; second < 90; second++) schedule.Tick(second, false, 1);
+            Check(!schedule.Tick(90, true, 1), "paused or modal time excluded from autosave timer");
+            bool due = false;
+            for (int second = 91; second <= 120; second++) due = schedule.Tick(second, true, 1);
+            Check(due, "autosave becomes due after sixty seconds of active play");
+            schedule.Completed();
+            Check(!schedule.Tick(500, true, 1), "no catch-up save after a suspended process");
+            schedule.Reset();
+            Check(!schedule.Tick(501, true, 1) && !schedule.Tick(502, true, 0), "mission reset and disabled autosave cancel pending saves");
             settings.BuildingKeys.Add(new BuildingBinding { EntityType = "ZX.Entities.TentHouse", Key = 84 });
             settings.Write(settingsPath);
             Check(Settings.Read(settingsPath).BuildingKeys[0].Key == 84, "building overrides round trip");
@@ -78,13 +95,27 @@ internal static class Program
             Check(Throws<InvalidDataException>(() => store.StageLoad("campaign1-mission1", "quick", nativeSaves)), "corrupt snapshot rejected before load");
             Check(Throws<InvalidDataException>(() => store.Read("..", "quick")), "snapshot path traversal rejected");
             Check(Throws<IOException>(() => store.Save("campaign2", "quick", nativeSaves, p => File.WriteAllText(p, "no-checksum"))), "incomplete native save pair rejected");
-            if (args.Length == 1)
+            for (int i = 1; i <= 5; i++)
             {
-                string prepared = Path.Combine(root, "prepared.exe");
-                Patcher.Prepare(args[0], prepared);
+                string slot = store.NextAutosaveSlot("history");
+                Check(slot == "autosave" + i, "autosave fills separate history slot " + i);
+                store.Save("history", slot, nativeSaves, p => Write(p, "history " + i));
+            }
+            string oldest = store.NextAutosaveSlot("history");
+            Check(oldest == "autosave1", "full autosave ring replaces oldest slot");
+            store.Save("history", oldest, nativeSaves, p => Write(p, "sixth"));
+            Check(store.NextAutosaveSlot("history") == "autosave2" && store.Read("history", "quick") == null && store.Read("history", "slot1") == null, "autosave rotates without touching quick or manual slots");
+            Check(Compatibility.Supported(Compatibility.OriginalSha256) && Compatibility.Supported(Compatibility.SteamSha256) && !Compatibility.Supported("unknown"), "only exact GOG and Steam originals supported");
+            foreach (string original in args)
+            {
+                string originalHash = SnapshotStore.Hash(original);
+                string prepared = Path.Combine(root, originalHash + "-prepared.exe");
+                Patcher.Prepare(original, prepared);
                 Patcher.Verify(prepared);
-                Check(File.Exists(prepared), "actual supported EXE patched and all eight hook names verified");
-                Check(SnapshotStore.Hash(args[0]) == Compatibility.OriginalSha256, "original EXE unchanged");
+                Patcher.VerifyMetadata(original, prepared);
+                Check(true, "original metadata token identities preserved");
+                Check(File.Exists(prepared), "actual " + Compatibility.VersionFor(originalHash) + " patched and all nine hook names verified");
+                Check(SnapshotStore.Hash(original) == originalHash, "original EXE unchanged");
                 Check(Throws<InvalidDataException>(() => Patcher.Prepare(prepared, Path.Combine(root, "double.exe"))), "double patch rejected");
             }
             Console.WriteLine(passed + " checks passed.");

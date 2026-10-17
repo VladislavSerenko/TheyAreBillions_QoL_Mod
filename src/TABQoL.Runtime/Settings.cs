@@ -15,8 +15,10 @@ namespace TABQoL
         public int QuickLoadKey { get; set; } = 120;
         public int SlowerKey { get; set; } = 219;
         public int FasterKey { get; set; } = 221;
-        public int MenuKey { get; set; } = 121;
+        public int MenuKey { get; set; } = 122;
         public int CheatsKey { get; set; } = 123;
+        public int SettingsVersion { get; set; }
+        public int AutosaveMinutes { get; set; } = 10;
         public List<BuildingBinding> BuildingKeys { get; set; } = new List<BuildingBinding>();
 
         public int[] GlobalKeys() { return new[] { QuickSaveKey, QuickLoadKey, SlowerKey, FasterKey, MenuKey, CheatsKey }; }
@@ -24,6 +26,7 @@ namespace TABQoL
         public void Validate()
         {
             if (!Policy.ValidSpeed(Speed)) throw new InvalidDataException("Speed must be 0.5, 1, 2, 3, 4 or 5.");
+            if (AutosaveMinutes < 0 || AutosaveMinutes > 1440) throw new InvalidDataException("Autosave interval must be 0 (off) or 1 to 1440 minutes.");
             var keys = GlobalKeys();
             if (keys.Any(k => !BindableKey(k)) || keys.Distinct().Count() != keys.Length)
                 throw new InvalidDataException("Choose distinct keyboard keys; Enter, Escape, Windows and modifier keys are reserved.");
@@ -48,6 +51,10 @@ namespace TABQoL
             using (var stream = File.OpenRead(path))
             {
                 var settings = (Settings)new XmlSerializer(typeof(Settings)).Deserialize(stream);
+                if (settings.SettingsVersion < 3 && settings.MenuKey == 121 &&
+                    !new[] { settings.QuickSaveKey, settings.QuickLoadKey, settings.SlowerKey, settings.FasterKey, settings.CheatsKey }.Contains(122))
+                    settings.MenuKey = 122;
+                settings.SettingsVersion = 3;
                 settings.Validate();
                 return settings;
             }
@@ -55,6 +62,7 @@ namespace TABQoL
 
         public void Write(string path)
         {
+            SettingsVersion = 3;
             Validate();
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             string pending = path + ".new";

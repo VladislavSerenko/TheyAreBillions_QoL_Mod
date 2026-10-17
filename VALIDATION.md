@@ -1,10 +1,42 @@
-# Validation — 0.2.1
+# Validation — 0.3.0 candidate
+
+## Current automated verification (2026-10-17)
+
+51 checks pass with both original Steam and GOG executables supplied; 43 run
+without game files. This includes the previous policy/storage checks plus:
+
+- F10-to-F11 default migration and preservation of custom menu keys.
+- Autosave intervals, active time, pauses, suspension and mission/timer resets.
+- Five independent autosave slots, oldest-slot replacement and manual isolation.
+- The QWERT / ASDFG / ZXCVB command grid mapping.
+- Exact-build detection, nine hook names and rejection of double patching.
+- Preservation of original definition/reference metadata token identities for
+  both editions. The writer also preserves metadata heap offsets.
+
+## Current integration status
+
+The initial Steam launch using the previous assembly writer stopped before the
+runtime initialized, with the native error `DAT Files could no be read`.
+Comparison showed that writer renumbered 4,995 of 4,996 original MemberRef
+tokens. The new dnlib writer preserves those identities and passes the checks
+above, but a fresh native launch is still required to confirm the fix.
+
+Windows denies automated access to close the stuck game process. Steam UI,
+slot 10, timed autosaves, F11 and contextual recruitment keys have **not yet
+been verified in the running 0.3.0 game**. Treat this build as a candidate until
+those checks are completed. All 32 existing player save/checksum files still
+match the fresh baseline byte for byte. No test campaign was created.
+
+The following integration results belong to the previous GOG release and are
+retained as historical coverage, not as Steam validation.
+
+## Historical validation — GOG 0.2.1
 
 Tested on Windows, 2026-10-16, against the exact GOG x64 1.1.4.10 executable
 identified in the README. These results describe this build, not other game
 versions.
 
-## Automated checks
+### Automated checks
 
 30 checks pass with the optional supported original EXE supplied. The first
 27 run without the game. Coverage includes:
@@ -22,7 +54,7 @@ versions.
 Policy arithmetic checks alone do not verify native campaign behavior. The
 integration checks below exercise the game's own implementations.
 
-## Local game integration
+### Local game integration
 
 Tests used separately named campaign copies with separate game IDs. Original
 player save/checksum files were compared with the backup taken before each
@@ -53,7 +85,7 @@ The hero test used a prepared, uncompleted hero mission in an isolated campaign
 copy. It did not modify an original campaign. Diagnostic command handlers used
 for these local checks are excluded from the release and repository.
 
-## Limits
+### Historical limits
 
 - Only the exact supported EXE is accepted. No Steam/x86 compatibility claim.
 - Campaign colony save/load was exercised directly. Hero/swarm and survival

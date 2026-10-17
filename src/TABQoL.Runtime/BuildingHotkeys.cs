@@ -34,16 +34,15 @@ namespace TABQoL
                     .OrderBy(e => e.Category).ThenBy(e => (int)Reflect.Get(e.Command, "PanelPosition")).ThenBy(e => e.Id).ToList();
                 foreach (var group in entries.GroupBy(e => e.Category))
                 {
-                    var used = new HashSet<int>();
-                    foreach (var entry in group.OrderBy(e => e.Id.EndsWith(".TentHouse", StringComparison.Ordinal) ? 0 : 1))
+                    var used = new HashSet<int>(group.Select(e => Bridge.Config.BuildingKeys.FirstOrDefault(b => b.EntityType == e.Id))
+                        .Where(b => b != null && b.Key != 0).Select(b => b.Key));
+                    foreach (var entry in group)
                     {
                         var custom = Bridge.Config.BuildingKeys.FirstOrDefault(b => b.EntityType == entry.Id);
-                        // The remaining keys follow the command grid, with T reserved for the tent.
-                        int preferred = entry.Id.EndsWith(".TentHouse", StringComparison.Ordinal) ? 84 :
-                            "QWERTASDFGZXCVBYUIOPHJKLNM"[((int)Reflect.Get(entry.Command, "PanelPosition") - 1) % 26];
+                        int preferred = Policy.GridKey((int)Reflect.Get(entry.Command, "PanelPosition"));
                         entry.Key = custom != null ? custom.Key :
                             new[] { preferred }.Concat("QWERTASDFGZXCVBYUIOPHJKLNM".Select(c => (int)c))
-                                .FirstOrDefault(k => !used.Contains(k) && !Bridge.Config.GlobalKeys().Contains(k));
+                                .FirstOrDefault(k => k != 0 && !used.Contains(k) && !Bridge.Config.GlobalKeys().Contains(k));
                         if (entry.Key != 0) used.Add(entry.Key);
                     }
                 }
@@ -79,16 +78,17 @@ namespace TABQoL
         internal static void UpdateControl(object control)
         {
             if (Bridge.Config == null) return;
-            var command = Reflect.Get(control, "Tag");
-            var entry = command != null && command.GetType().FullName == "ZX.Commands.Build" ? Entries.FirstOrDefault(e => ReferenceEquals(e.Command, command)) : null;
+            int key = SelectedStructure() && (bool)Reflect.Get(control, "Visible") ? KeyFor(control) : 0;
             object hint;
             hints.TryGetValue(control, out hint);
-            if (entry == null)
+            if (key == 0)
             {
+                // The native grid resets keys before repopulating a selection.
+                // Do not erase a native unit key assigned during that refresh.
                 if (hint != null) Reflect.Set(hint, "Visible", false);
                 return;
             }
-            Reflect.Set(control, "FixedKey", Enum.ToObject(Reflect.Type("DXVision.DXKeys"), entry.Key));
+            Reflect.Set(control, "FixedKey", Enum.ToObject(Reflect.Type("DXVision.DXKeys"), key));
             if (hint == null)
             {
                 var sceneObject = Reflect.Get(control, "ScnObject");
@@ -103,23 +103,46 @@ namespace TABQoL
                 Reflect.Call(sceneObject, "AddObject", hint);
                 hints.Add(control, hint);
             }
-            Reflect.Set(hint, "Text", entry.Key == 0 ? "" : ((char)entry.Key).ToString());
-            Reflect.Set(hint, "Visible", (bool)Reflect.Get(control, "Visible") && entry.Key != 0);
+            Reflect.Set(hint, "Text", ((char)key).ToString());
+            Reflect.Set(hint, "Visible", true);
+        }
+
+        private static bool SelectedStructure()
+        {
+            if (!Bridge.InMission) return false;
+            var selected = Reflect.Call(Reflect.Type("ZX.Components.CSelectable"), "#=zBmnjUnslgJaG");
+            return selected != null && Reflect.Type("ZX.Entities.Structure").IsInstanceOfType(selected) && Reflect.Get(selected, "Team").ToString() == "Player";
+        }
+
+        private static int KeyFor(object control)
+        {
+            var command = Reflect.Get(control, "Tag");
+            var entry = command != null && command.GetType().FullName == "ZX.Commands.Build" ? Entries.FirstOrDefault(e => ReferenceEquals(e.Command, command)) : null;
+            if (entry != null) return entry.Key;
+            var parent = Reflect.Get(Reflect.Get(control, "ScnObject"), "Parent");
+            var grid = parent == null ? null : Reflect.Get(parent, "Tag");
+            if (grid == null || grid.GetType().FullName != "ZX.GUI.ZXControlCommandsManager") return 0;
+            var buttons = (Array)Reflect.Field(grid, "#=zZFf9lzN32EUS");
+            for (int row = 0; row < 3; row++)
+                for (int column = 0; column < 5; column++)
+                    if (ReferenceEquals(buttons.GetValue(column, row), control))
+                    {
+                        int key = Policy.GridKey(row * 5 + column + 1);
+                        return Bridge.Config.GlobalKeys().Contains(key) ? 0 : key;
+                    }
+            return 0;
         }
 
         internal static bool OnKey(object system, int key)
         {
-            if (!Bridge.InMission || !Bridge.Ready || Ui.CaptureKey != null || Bridge.HasModifier ||
+            if (!Bridge.InMission || !Bridge.Ready || Ui.CaptureKey != null || Bridge.HasModifier || !SelectedStructure() ||
                 (bool)Reflect.Get(Reflect.Type("DXVision.GUI.DXModalScreen"), "IsInModal")) return false;
             var grid = Reflect.Field(system, Grid);
             if (grid == null || !(bool)Reflect.Get(Reflect.Get(grid, "ScnObject"), "Visible")) return false;
             var buttons = (Array)Reflect.Field(grid, "#=zZFf9lzN32EUS");
             foreach (var button in buttons)
             {
-                var command = Reflect.Get(button, "Tag");
-                if (command == null || command.GetType().FullName != "ZX.Commands.Build" || !(bool)Reflect.Get(button, "Visible")) continue;
-                var entry = Entries.FirstOrDefault(e => ReferenceEquals(e.Command, command));
-                if (entry == null || entry.Key != key) continue;
+                if (!(bool)Reflect.Get(button, "Visible") || KeyFor(button) != key) continue;
                 if ((bool)Reflect.Get(button, "Enabled")) Reflect.Call(system, "#=zEHnEwyMK7mIMOOClaw==", button);
                 return true;
             }

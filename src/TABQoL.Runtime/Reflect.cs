@@ -15,6 +15,7 @@ namespace TABQoL
 
         internal static Type Type(string name)
         {
+            name = Compatibility.RuntimeSymbol(name);
             var t = GameAssembly.GetType(name, false);
             if (t != null) return t;
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -60,6 +61,7 @@ namespace TABQoL
 
         internal static MethodInfo Method(Type type, string name, object[] args)
         {
+            name = Compatibility.RuntimeSymbol(name);
             return type.GetMethods(Flags).Single(m => m.Name == name && Fits(m.GetParameters(), args));
         }
 
@@ -93,6 +95,7 @@ namespace TABQoL
 
         internal static object Field(object instance, string name)
         {
+            name = Compatibility.RuntimeSymbol(name);
             return instance.GetType().GetField(name, Flags).GetValue(instance);
         }
 

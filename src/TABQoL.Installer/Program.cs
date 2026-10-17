@@ -35,8 +35,8 @@ namespace TABQoL.Installer
                 {
                     case "inspect":
                         Console.WriteLine("EXE SHA-256: " + SnapshotStore.Hash(exe));
-                        Console.WriteLine("Supported: " + Compatibility.GameVersion);
-                        if (SnapshotStore.Hash(exe) == Compatibility.OriginalSha256) { Console.WriteLine("Compatible original EXE."); return 0; }
+                        Console.WriteLine("Supported: " + Compatibility.GameVersion + "; " + Compatibility.SteamVersion);
+                        if (Compatibility.Supported(SnapshotStore.Hash(exe))) { Console.WriteLine("Compatible original EXE: " + Compatibility.VersionFor(SnapshotStore.Hash(exe))); return 0; }
                         var status = ReadManifest(directory);
                         if (status != null && SnapshotStore.Hash(exe) == status.PatchedHash) { Console.WriteLine("TAB QoL is installed."); return 0; }
                         throw new InvalidDataException("This executable is not supported.");
@@ -81,7 +81,8 @@ namespace TABQoL.Installer
                 { Console.WriteLine("TAB QoL is already installed."); return; }
                 throw new IOException("An installation manifest already exists. Run uninstall before reinstalling.");
             }
-            if (SnapshotStore.Hash(exe) != Compatibility.OriginalSha256) throw new InvalidDataException("Unsupported/modified game EXE; no files changed.");
+            string originalHash = SnapshotStore.Hash(exe);
+            if (!Compatibility.Supported(originalHash)) throw new InvalidDataException("Unsupported/modified game EXE; no files changed.");
             string runtimeSource = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Runtime), runtimeTarget = Path.Combine(directory, Runtime);
             if (!File.Exists(runtimeSource)) throw new FileNotFoundException("Keep the installer and runtime DLL together.");
             if (File.Exists(runtimeTarget)) throw new IOException("An unowned runtime DLL already exists; no files changed.");
@@ -94,14 +95,14 @@ namespace TABQoL.Installer
             try
             {
                 Patcher.Prepare(original, staged);
-                var manifest = new Manifest { OriginalHash = Compatibility.OriginalSha256, PatchedHash = SnapshotStore.Hash(staged), RuntimeHash = SnapshotStore.Hash(runtimeSource), InstalledUtc = DateTime.UtcNow };
+                var manifest = new Manifest { OriginalHash = originalHash, PatchedHash = SnapshotStore.Hash(staged), RuntimeHash = SnapshotStore.Hash(runtimeSource), InstalledUtc = DateTime.UtcNow };
                 BackupSaves();
                 File.Copy(runtimeSource, runtimeTarget);
                 using (var stream = File.Create(ManifestPath(directory))) new XmlSerializer(typeof(Manifest)).Serialize(stream, manifest);
                 File.Replace(staged, exe, null);
                 committed = true;
-                Console.WriteLine("Installed TAB QoL for " + Compatibility.GameVersion + ".");
-                Console.WriteLine("F5 save, F9 load, [ slower, ] faster, F10 menu, F12 debug cheats. Options > TAB QoL.");
+                Console.WriteLine("Installed TAB QoL for " + Compatibility.VersionFor(originalHash) + ".");
+                Console.WriteLine("F5 save, F9 load, [ slower, ] faster, F11 menu, F12 debug cheats. Options > TAB QoL.");
                 Console.WriteLine("Original EXE: " + original);
             }
             finally
@@ -139,7 +140,7 @@ namespace TABQoL.Installer
             string currentHash = SnapshotStore.Hash(exe);
             if (currentHash != manifest.PatchedHash && currentHash != manifest.OriginalHash)
                 throw new IOException("The game EXE changed after installation. Refusing to overwrite it.");
-            if (manifest.OriginalHash != Compatibility.OriginalSha256 || SnapshotStore.Hash(original) != Compatibility.OriginalSha256)
+            if (!Compatibility.Supported(manifest.OriginalHash) || SnapshotStore.Hash(original) != manifest.OriginalHash)
                 throw new IOException("Original backup checksum mismatch. Refusing to restore it.");
             string runtime = Path.Combine(directory, Runtime);
             if (File.Exists(runtime) && SnapshotStore.Hash(runtime) != manifest.RuntimeHash)

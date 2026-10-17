@@ -1,12 +1,11 @@
 # Third-party notices
 
-The release includes `Mono.Cecil.dll` and `Mono.Cecil.Rocks.dll` from
-[Mono.Cecil 0.11.6](https://github.com/jbevain/cecil/tree/0.11.6).
-Their [license](https://github.com/jbevain/cecil/blob/0.11.6/LICENSE.txt) follows.
+The release includes `dnlib.dll` from
+[dnlib 4.5.0](https://github.com/0xd4d/dnlib/tree/v4.5.0).
+Its [license](https://github.com/0xd4d/dnlib/blob/v4.5.0/LICENSE.txt) follows.
 
 ```text
-Copyright (c) 2008 - 2015 Jb Evain
-Copyright (c) 2008 - 2011 Novell, Inc.
+Copyright (C) 2012-2019 de4dot@gmail.com
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
