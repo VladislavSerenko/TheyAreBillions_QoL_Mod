@@ -15,8 +15,8 @@ try {
         $release = Join-Path $projectRoot 'artifacts/TABQoL-0.3.0'
         New-Item -ItemType Directory -Path $release -Force | Out-Null
         $source = Join-Path $projectRoot 'src/TABQoL.Installer/bin/Release/net462'
-        $binaryNames = @('TABQoL.Installer.exe','TABQoL.Installer.exe.config','TABQoL.Runtime.dll','dnlib.dll')
-        $documentNames = @('Install.ps1','Uninstall.ps1','README.md','README.ru.md','VALIDATION.md','LICENSE','THIRD-PARTY-NOTICES.md')
+        $binaryNames = @('TABQoL.Installer.exe','TABQoL.Installer.exe.config','TABQoL.Runtime.dll','0Harmony.dll','dnlib.dll')
+        $documentNames = @('Install.ps1','Uninstall.ps1','INSTALLATION.md','README.md','README.ru.md','VALIDATION.md','LICENSE','THIRD-PARTY-NOTICES.md')
         foreach ($name in $binaryNames) {
             Copy-Item -LiteralPath (Join-Path $source $name) -Destination $release
         }

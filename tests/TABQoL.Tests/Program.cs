@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
+using System.Xml;
 using TABQoL;
 using TABQoL.Installer;
+using Installer = TABQoL.Installer.Program;
 
 internal static class Program
 {
@@ -17,6 +21,96 @@ internal static class Program
     {
         try { action(); return false; }
         catch (T) { return true; }
+    }
+
+    private static void SteamLifecycle(string root, string original)
+    {
+        string game = Path.Combine(root, "SteamLifecycle");
+        Directory.CreateDirectory(game);
+        string exe = Path.Combine(game, "TheyAreBillions.exe");
+        string config = exe + ".config";
+        string runtime = Path.Combine(game, "TABQoL.Runtime.dll"), harmony = Path.Combine(game, "0Harmony.dll");
+        string installation = Path.Combine(game, "TABQoL.Installation");
+        File.Copy(original, exe);
+        File.WriteAllText(config, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<configuration>\r\n" +
+            "  <!-- Кампания: keep original bytes -->\r\n  <runtime><gcServer enabled=\"true\" /></runtime>\r\n</configuration>\r\n", new UTF8Encoding(false));
+        string originalConfigHash = SnapshotStore.Hash(config);
+        int backups = 0, guards = 0;
+        Action backup = () => backups++;
+        Action guard = () => guards++;
+        Installer.Install(game, backup, guard);
+        var manifest = Installer.ReadManifest(game);
+        Check(manifest != null && manifest.Mode == "steam-startup-config" && backups == 1 && guards == 1 &&
+            manifest.OriginalConfigExists && manifest.OriginalConfigHash == originalConfigHash &&
+            SnapshotStore.Hash(exe) == Compatibility.SteamSha256 &&
+            SnapshotStore.Hash(Path.Combine(installation, "original", "TheyAreBillions.exe")) == Compatibility.SteamSha256 &&
+            SnapshotStore.Hash(Path.Combine(installation, "original", "TheyAreBillions.exe.config")) == originalConfigHash,
+            "Steam install keeps the exact EXE and records exact original EXE/config backups");
+        Check(SnapshotStore.Hash(runtime) == manifest.RuntimeHash && SnapshotStore.Hash(harmony) == manifest.HarmonyHash &&
+            SnapshotStore.Hash(config) == manifest.PatchedConfigHash && manifest.PatchedHash == Compatibility.SteamSha256,
+            "Steam manifest owns both copied DLLs and the startup config by checksum");
+        var configXml = new XmlDocument();
+        configXml.Load(config);
+        Check(configXml.SelectSingleNode("/configuration/runtime/gcServer/@enabled").Value == "true" &&
+            configXml.SelectSingleNode("/configuration/runtime/appDomainManagerType/@value").Value == "TABQoL.SteamDomainManager",
+            "Steam installed config keeps existing options and enables the runtime manager");
+        string inspectOutput;
+        var console = Console.Out;
+        using (var writer = new StringWriter())
+        {
+            try { Console.SetOut(writer); Installer.Inspect(game); }
+            finally { Console.SetOut(console); }
+            inspectOutput = writer.ToString();
+        }
+        Check(inspectOutput.Contains("TAB QoL is installed") && !inspectOutput.Contains("Compatible original EXE"),
+            "Steam inspect recognizes the manifest before the unchanged original EXE hash");
+        Installer.Install(game, backup, guard);
+        Check(backups == 1 && SnapshotStore.Hash(config) == manifest.PatchedConfigHash,
+            "repeated Steam install recognizes ownership without another backup or config edit");
+        var owned = new[] { exe, config, runtime, harmony,
+            Path.Combine(installation, "original", "TheyAreBillions.exe"),
+            Path.Combine(installation, "original", "TheyAreBillions.exe.config") };
+        foreach (string changed in owned)
+        {
+            byte[] unchanged = File.ReadAllBytes(changed);
+            File.AppendAllText(changed, "changed after install");
+            var before = owned.ToDictionary(path => path, SnapshotStore.Hash);
+            Check(Throws<IOException>(() => Installer.Uninstall(game, guard)) &&
+                before.All(file => SnapshotStore.Hash(file.Key) == file.Value) && Installer.ReadManifest(game) != null,
+                "Steam uninstall rejects changed " + Path.GetFileName(Path.GetDirectoryName(changed)) + "/" + Path.GetFileName(changed) + " before modifying files");
+            File.WriteAllBytes(changed, unchanged);
+        }
+        Installer.Uninstall(game, guard);
+        var archives = Directory.GetDirectories(game, "TABQoL.Installation.uninstalled-*");
+        Check(SnapshotStore.Hash(exe) == Compatibility.SteamSha256 && SnapshotStore.Hash(config) == originalConfigHash &&
+            !File.Exists(runtime) && !File.Exists(harmony) && !Directory.Exists(installation),
+            "Steam uninstall restores the exact config and removes only its owned DLLs");
+        Check(archives.Length == 1 && Path.GetDirectoryName(archives[0]) == game &&
+            SnapshotStore.Hash(Path.Combine(archives[0], "original", "TheyAreBillions.exe.config")) == originalConfigHash,
+            "Steam uninstall archives the exact backups inside the test game directory");
+        File.Delete(config);
+        Installer.Install(game, backup, guard);
+        manifest = Installer.ReadManifest(game);
+        Check(!manifest.OriginalConfigExists && string.IsNullOrEmpty(manifest.OriginalConfigHash) && File.Exists(config),
+            "Steam install records a previously absent startup config");
+        Installer.Uninstall(game, guard);
+        Check(!File.Exists(config) && !File.Exists(runtime) && !File.Exists(harmony) && SnapshotStore.Hash(exe) == Compatibility.SteamSha256,
+            "Steam uninstall removes a newly created config and preserves the original EXE");
+        File.WriteAllText(config, "<configuration><runtime><appDomainManagerType value=\"Another.Mod\" /></runtime></configuration>");
+        string foreignConfigHash = SnapshotStore.Hash(config);
+        Check(Throws<InvalidDataException>(() => Installer.Install(game, backup, guard)) &&
+            SnapshotStore.Hash(config) == foreignConfigHash && !Directory.Exists(installation) && !File.Exists(runtime) && !File.Exists(harmony),
+            "Steam install refuses another manager without creating installation files");
+        File.Delete(config);
+        foreach (string unowned in new[] { runtime, harmony })
+        {
+            File.WriteAllText(unowned, "another mod owns this DLL");
+            string unownedHash = SnapshotStore.Hash(unowned);
+            Check(Throws<IOException>(() => Installer.Install(game, backup, guard)) &&
+                SnapshotStore.Hash(unowned) == unownedHash && !Directory.Exists(installation) && !File.Exists(config),
+                "Steam install preserves unowned " + Path.GetFileName(unowned));
+            File.Delete(unowned);
+        }
     }
 
     private static int Main(string[] args)
@@ -105,11 +199,70 @@ internal static class Program
             Check(oldest == "autosave1", "full autosave ring replaces oldest slot");
             store.Save("history", oldest, nativeSaves, p => Write(p, "sixth"));
             Check(store.NextAutosaveSlot("history") == "autosave2" && store.Read("history", "quick") == null && store.Read("history", "slot1") == null, "autosave rotates without touching quick or manual slots");
+            string configPath = Path.Combine(root, "TheyAreBillions.exe.config");
+            const string unicodeConfigText = "Кампания — испытание 猫";
+            var utf8 = new UTF8Encoding(false, true);
+            File.WriteAllText(configPath, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<configuration>\n  <!-- keep existing options -->\n" +
+                "  <startup useLegacyV2RuntimeActivationPolicy=\"true\"><supportedRuntime version=\"v4.0\" sku=\".NETFramework,Version=v4.6.2\" /></startup>\n" +
+                "  <appSettings><add key=\"Campaign\" value=\"" + unicodeConfigText + "\" /></appSettings>\n" +
+                "  <runtime><gcServer enabled=\"true\" /><assemblyBinding xmlns=\"urn:schemas-microsoft-com:asm.v1\">" +
+                "<dependentAssembly><assemblyIdentity name=\"Example.Dependency\" publicKeyToken=\"0123456789abcdef\" culture=\"neutral\" />" +
+                "<bindingRedirect oldVersion=\"0.0.0.0-2.0.0.0\" newVersion=\"2.0.0.0\" /></dependentAssembly></assemblyBinding></runtime>\n</configuration>", utf8);
+            string originalConfigHash = SnapshotStore.Hash(configPath);
+            byte[] preparedConfig = StartupConfig.Prepare(configPath);
+            XmlDocument ReadConfig(byte[] bytes)
+            {
+                var document = new XmlDocument { XmlResolver = null };
+                using (var stream = new MemoryStream(bytes)) document.Load(stream);
+                return document;
+            }
+            var config = ReadConfig(preparedConfig);
+            var configNamespaces = new XmlNamespaceManager(config.NameTable);
+            configNamespaces.AddNamespace("asm", "urn:schemas-microsoft-com:asm.v1");
+            Check(config.SelectNodes("/configuration/runtime").Count == 1 &&
+                config.SelectSingleNode("/configuration/startup/@useLegacyV2RuntimeActivationPolicy").Value == "true" &&
+                config.SelectSingleNode("/configuration/startup/supportedRuntime/@sku").Value == ".NETFramework,Version=v4.6.2" &&
+                config.SelectSingleNode("/configuration/runtime/gcServer/@enabled").Value == "true" &&
+                config.SelectSingleNode("/configuration/runtime/asm:assemblyBinding/asm:dependentAssembly/asm:bindingRedirect/@newVersion", configNamespaces).Value == "2.0.0.0",
+                "Steam startup config preserves CLR options and namespaced assembly redirects");
+            Check(utf8.GetString(preparedConfig).Contains(unicodeConfigText) &&
+                config.SelectSingleNode("/configuration/appSettings/add[@key='Campaign']/@value").Value == unicodeConfigText &&
+                SnapshotStore.Hash(configPath) == originalConfigHash,
+                "Steam config preserves UTF-8 text without modifying the original file");
+            Check(config.SelectNodes("/configuration/runtime/appDomainManagerAssembly").Count == 1 &&
+                config.SelectNodes("/configuration/runtime/appDomainManagerType").Count == 1 &&
+                config.SelectSingleNode("/configuration/runtime/appDomainManagerAssembly/@value").Value == typeof(Bridge).Assembly.FullName &&
+                config.SelectSingleNode("/configuration/runtime/appDomainManagerType/@value").Value == "TABQoL.SteamDomainManager",
+                "Steam config selects the exact runtime manager assembly and type");
+            var createdConfig = ReadConfig(StartupConfig.Prepare(null));
+            Check(createdConfig.DocumentElement.Name == "configuration" &&
+                createdConfig.SelectSingleNode("/configuration/runtime/appDomainManagerAssembly/@value").Value == typeof(Bridge).Assembly.FullName &&
+                createdConfig.SelectSingleNode("/configuration/runtime/appDomainManagerType/@value").Value == "TABQoL.SteamDomainManager",
+                "Steam startup config is created when the game has no config file");
+            foreach (string managerNode in new[] { "appDomainManagerAssembly", "appDomainManagerType" })
+            {
+                File.WriteAllText(configPath, "<configuration><runtime><" + managerNode + " value=\"Another.Mod\" /></runtime></configuration>", utf8);
+                Check(Throws<InvalidDataException>(() => StartupConfig.Prepare(configPath)), "existing " + managerNode + " prevents startup config takeover");
+            }
+            File.WriteAllText(configPath, "<configuration><runtime configSource=\"external.config\" /></configuration>", utf8);
+            Check(Throws<InvalidDataException>(() => StartupConfig.Prepare(configPath)), "external runtime config is rejected without following it");
+            File.WriteAllText(configPath, "<configuration><runtime></configuration>", utf8);
+            Check(Throws<XmlException>(() => StartupConfig.Prepare(configPath)), "malformed startup XML is rejected");
+            File.WriteAllText(configPath, "<configuration><runtime /><runtime /></configuration>", utf8);
+            Check(Throws<InvalidDataException>(() => StartupConfig.Prepare(configPath)), "duplicate runtime sections are rejected");
             Check(Compatibility.Supported(Compatibility.OriginalSha256) && Compatibility.Supported(Compatibility.SteamSha256) && !Compatibility.Supported("unknown"), "only exact GOG and Steam originals supported");
             foreach (string original in args)
             {
                 string originalHash = SnapshotStore.Hash(original);
                 string prepared = Path.Combine(root, originalHash + "-prepared.exe");
+                if (originalHash == Compatibility.SteamSha256)
+                {
+                    Check(Throws<InvalidDataException>(() => Patcher.Prepare(original, prepared)) && !File.Exists(prepared) &&
+                        SnapshotStore.Hash(original) == originalHash, "Steam EXE rewriting is rejected before creating output");
+                    SteamLifecycle(root, original);
+                    continue;
+                }
                 Patcher.Prepare(original, prepared);
                 Patcher.Verify(prepared);
                 Patcher.VerifyMetadata(original, prepared);

@@ -117,6 +117,7 @@ namespace TABQoL
                 new[] { "quick" }.Concat(Enumerable.Range(page * 5 + 1, 5).Select(i => "slot" + i)).Concat(new[] { "before-cheat-win" }).ToArray();
             var sample = Reflect.New("ZX.GUI.ZXButtonSteam", "Save", null);
             float buttonWidth = (float)Reflect.Get(sample, "Width");
+            float buttonHeight = (float)Reflect.Get(sample, "Height");
             float groupX = width - buttonWidth * 2 - 6 * u;
             for (int i = 0; i < slots.Length; i++)
             {
@@ -125,7 +126,7 @@ namespace TABQoL
                 string caption = slot + (snapshot == null ? " (empty)" : "  " + snapshot.CreatedUtc.ToLocalTime().ToString("g"));
                 float y = (60 + i * 52) * u;
                 var label = Label(caption, groupX - 8 * u);
-                Add(content, label, 0, y + 9 * u, groupX - 8 * u, 40 * u);
+                Add(content, label, 0, y + (buttonHeight - 14 * u) / 2, groupX - 8 * u, 40 * u);
                 var load = MetalButton(content, "Load", groupX + buttonWidth + 6 * u, y, buttonWidth, () => Bridge.Load(slot));
                 Reflect.Set(load, "Enabled", snapshot != null);
                 if (page != 2 && slot != "before-cheat-win") MetalButton(content, "Save", groupX, y, buttonWidth, () =>

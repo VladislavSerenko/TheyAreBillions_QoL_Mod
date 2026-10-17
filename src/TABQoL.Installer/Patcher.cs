@@ -15,6 +15,8 @@ namespace TABQoL.Installer
             string hash = SnapshotStore.Hash(original);
             if (!Compatibility.Supported(hash))
                 throw new InvalidDataException("Unsupported or already modified EXE. See the exact supported hashes in README.");
+            if (hash == Compatibility.SteamSha256)
+                throw new InvalidDataException("Steam EXE rewriting is not supported. Use install <game-directory>; Steam loads TAB QoL through its startup config and keeps the original EXE unchanged.");
             bool steam = hash == Compatibility.SteamSha256;
             string Symbol(string name) { return Compatibility.Symbol(name, steam); }
             using (var module = ModuleDefMD.Load(original))

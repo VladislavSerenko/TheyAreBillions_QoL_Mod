@@ -78,7 +78,26 @@ namespace TABQoL
         internal static void UpdateControl(object control)
         {
             if (Bridge.Config == null) return;
-            int key = SelectedStructure() && (bool)Reflect.Get(control, "Visible") ? KeyFor(control) : 0;
+            bool structure = SelectedStructure();
+            bool visible = (bool)Reflect.Get(control, "Visible");
+            if (structure && visible && IsCategory(Reflect.Get(control, "Tag")))
+            {
+                // Refresh every category together: native selection changes may
+                // repopulate controls in a different order from their grid positions.
+                // A later category must also update keys already drawn earlier.
+                var buttons = Buttons(control);
+                if (buttons != null)
+                {
+                    foreach (var button in buttons)
+                        if ((bool)Reflect.Get(button, "Visible") && IsCategory(Reflect.Get(button, "Tag"))) ApplyKey(button, KeyFor(button));
+                    return;
+                }
+            }
+            ApplyKey(control, structure && visible ? KeyFor(control) : 0);
+        }
+
+        private static void ApplyKey(object control, int key)
+        {
             object hint;
             hints.TryGetValue(control, out hint);
             if (key == 0)
@@ -116,13 +135,27 @@ namespace TABQoL
 
         private static int KeyFor(object control)
         {
+            // Back/Cancel uses Escape on key-down so the native key-up handler
+            // can suppress opening the game menu. Keep navigation outside the
+            // construction grid, including custom bindings such as T.
+            if (Convert.ToInt32(Reflect.Get(control, "FixedKey")) == 27) return 0;
             var command = Reflect.Get(control, "Tag");
             var entry = command != null && command.GetType().FullName == "ZX.Commands.Build" ? Entries.FirstOrDefault(e => ReferenceEquals(e.Command, command)) : null;
             if (entry != null) return entry.Key;
-            var parent = Reflect.Get(Reflect.Get(control, "ScnObject"), "Parent");
-            var grid = parent == null ? null : Reflect.Get(parent, "Tag");
-            if (grid == null || grid.GetType().FullName != "ZX.GUI.ZXControlCommandsManager") return 0;
-            var buttons = (Array)Reflect.Field(grid, "#=zZFf9lzN32EUS");
+            var buttons = Buttons(control);
+            if (buttons == null) return 0;
+            if (IsCategory(command))
+            {
+                // Category enum values encode native panel positions and contain
+                // gaps. Compact the displayed categories into Q,W,E,R,T,... while
+                // keeping their native positions and the build/recruitment grids.
+                var categories = buttons.Cast<object>().Where(b => (bool)Reflect.Get(b, "Visible"))
+                    .Select(b => Reflect.Get(b, "Tag")).Where(IsCategory)
+                    .Distinct().OrderBy(c => Convert.ToInt32(c)).ToList();
+                int ordinal = categories.FindIndex(c => Equals(c, command));
+                int key = Policy.GridKey(ordinal + 1);
+                return Bridge.Config.GlobalKeys().Contains(key) ? 0 : key;
+            }
             for (int row = 0; row < 3; row++)
                 for (int column = 0; column < 5; column++)
                     if (ReferenceEquals(buttons.GetValue(column, row), control))
@@ -131,6 +164,15 @@ namespace TABQoL
                         return Bridge.Config.GlobalKeys().Contains(key) ? 0 : key;
                     }
             return 0;
+        }
+
+        private static bool IsCategory(object tag) { return tag != null && tag.GetType().FullName == "ZX.ZXCommandCategory"; }
+
+        private static Array Buttons(object control)
+        {
+            var parent = Reflect.Get(Reflect.Get(control, "ScnObject"), "Parent");
+            var grid = parent == null ? null : Reflect.Get(parent, "Tag");
+            return grid == null || grid.GetType().FullName != "ZX.GUI.ZXControlCommandsManager" ? null : (Array)Reflect.Field(grid, "#=zZFf9lzN32EUS");
         }
 
         internal static bool OnKey(object system, int key)

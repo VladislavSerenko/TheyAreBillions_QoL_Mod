@@ -4,14 +4,14 @@
 
 An unofficial Windows mod with mission save/load slots, campaign research
 reset, optional hero mission skipping with full rewards, and adjustable
-simulation speed, building hotkeys and an F12 debug cheat panel. It patches
-your own installed game locally.
+simulation speed, building hotkeys and an F12 debug cheat panel. It installs
+into your own local copy of the game.
 
 ## Supported versions
 
-The 0.3.0 candidate targets **Steam and GOG x64**. Native Steam verification is
-pending; see [validation status](VALIDATION.md). The installer detects the edition
-from the original `TheyAreBillions.exe` SHA-256:
+Version 0.3.0 supports **Steam and GOG x64** for the exact builds below.
+See [tested behavior and limits](VALIDATION.md). The installer detects the
+edition from the original `TheyAreBillions.exe` SHA-256:
 
 ```text
 GOG 1.1.4.10:
@@ -42,9 +42,16 @@ normally with its own dependencies installed.
 3. Launch the game normally (through Steam for the Steam edition). Open
    **Options > TAB QoL** or press **F11**.
 
-The installer backs up the original EXE and user save files before replacing
-the executable. Keep `TABQoL.Installation` in the game directory for uninstall.
-To upgrade, uninstall the previous version before installing the new version.
+The installer backs up the original EXE and user save files. **Steam keeps the
+original EXE unchanged:** a CLR AppDomainManager entry in
+`TheyAreBillions.exe.config` loads the runtime, which uses Harmony to install
+hooks in memory. Existing startup/runtime options are preserved. **GOG uses a
+dnlib patch of the supported EXE.** See [installation modes](INSTALLATION.md).
+
+Keep `TABQoL.Installation` in the game directory for uninstall. Uninstall the
+previous mod version before upgrading or updating/verifying the game in Steam.
+Installation refuses a startup config that already selects another
+AppDomainManager and refuses to overwrite unowned mod DLLs.
 
 ## Controls
 
@@ -96,12 +103,14 @@ missed saves during a long suspension are not queued.
 
 ### Building hotkeys
 
+The five command-center construction categories use **Q W E R T** in order.
 Select a player building and use **Q W E R T** for its top command row,
 **A S D F G** for the middle row, and **Z X C V B** for the bottom row.
-This includes command-center construction categories, individual buildings,
-barracks recruitment and other building commands. The default tent key is Q.
+This covers individual buildings, barracks recruitment and other building
+commands. The default tent key is Q.
 Visible hints follow the current command grid. Native unlock, resource, queue
-and placement requirements still apply. Unit selections keep their native keys.
+and placement requirements still apply. Escape retains native Back/Cancel
+behavior. Unit selections keep their native keys.
 
 Open **F11 > Building hotkeys** or **Options > TAB QoL > Building hotkeys** to
 change each building key. Assign A–Z, Backspace to unbind, or Escape to cancel.
@@ -171,10 +180,9 @@ close the game and copy the matching `.zxsav`/`.zxcheck` and, where present,
 the exact filenames. Copy your current saves elsewhere first. Do not rename
 native saves: their serialization depends on the filename.
 
-If installation fails before committing, the original EXE remains unchanged
-and its backup is retained. Inspect the error and the retained
-`TABQoL.Installation` directory before moving that directory aside and retrying.
-Do not overwrite an EXE that has subsequently been updated by the game store.
+If installation fails, inspect the error and any retained
+`TABQoL.Installation` directory before retrying. Do not overwrite files that
+have subsequently been changed by the game store or another mod.
 
 ## Uninstall
 
@@ -185,10 +193,13 @@ Close the game and run:
 # Or: .\TABQoL.Installer.exe uninstall 'C:\Games\They Are Billions'
 ```
 
-Uninstall verifies hashes and restores the exact original EXE. It removes the
-runtime DLL, archives the installation record and preserves mod data/backups.
-It refuses to overwrite an executable changed after installation. Mod mission
-slots need the mod to load; the game's ordinary saves remain native files.
+Uninstall verifies owned-file and backup hashes before making changes. For
+Steam it restores the exact original config, or removes the config if none
+existed, and removes the owned runtime/Harmony DLLs; the EXE stays unchanged.
+For GOG it restores the exact original EXE and removes the runtime DLL. It
+archives the installation record and preserves saves, mod data and backups.
+Changed owned files are reported and left in place. Mod mission slots need
+the mod to load; the game's ordinary saves remain native files.
 
 ## Build and validation
 
@@ -196,16 +207,20 @@ On Windows with the .NET SDK 8 or newer:
 
 ```powershell
 .\Build.ps1 -Package
-# Optional: also verify patching against your own supported original EXE:
+# Optional: also verify installation against your supported original EXE:
 .\Build.ps1 -Package -OriginalExe 'C:\path\to\original\TheyAreBillions.exe'
 ```
 
-The release ZIP is written to `artifacts`. NuGet restores dnlib 4.5.0 and
-.NET Framework reference assemblies. No game assemblies are required to compile.
-Automated checks cover settings, speed stepping, slot isolation/retention,
-checksum rejection and interrupted writes. With `-OriginalExe`, they also patch
-a temporary copy, preserve original metadata token identities, verify all nine
-hook names and reject double patching. Supply multiple paths to test both editions:
+The release ZIP is written to `artifacts`. NuGet restores dnlib 4.5.0,
+Lib.Harmony 2.4.1 and .NET Framework reference assemblies. No game assemblies
+are required to compile. **52 automated checks** run without game files;
+**75 pass with both supported originals supplied**. They cover settings,
+autosave timing, command-grid mapping, slot isolation/retention, checksum
+rejection, interrupted writes and startup config preservation. With
+`-OriginalExe`, they also verify GOG patch hooks/metadata and Steam
+install/inspect/uninstall, ownership checks and exact config restoration in
+temporary directories. Steam EXE rewriting is rejected. Supply multiple paths
+to test both editions:
 
 ```powershell
 .\Build.ps1 -OriginalExe @('C:\GOG-original\TheyAreBillions.exe', 'C:\Steam-original\TheyAreBillions.exe')
@@ -217,6 +232,11 @@ simulation speeds may be limited by hardware. Compatibility with other mods is
 not established. The UI added by this version is in English.
 
 ## Share on GitHub
+
+Steam and GOG share this repository and release ZIP. Attach the ZIP from
+`artifacts` to a GitHub Release. Keep installed game files, saves, logs and
+personal backups out of Git; build outputs are ignored. GitHub Actions builds
+and runs the checks that do not require game files.
 
 Original mod code: [MIT](LICENSE). Bundled libraries:
 [third-party notices](THIRD-PARTY-NOTICES.md). Unofficial; not affiliated with the

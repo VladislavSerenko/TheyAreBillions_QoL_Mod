@@ -27,6 +27,7 @@ namespace TABQoL
         private static string stagedLoad;
         private static int loadFrames;
         private static readonly HashSet<int> heldKeys = new HashSet<int>();
+        private static readonly HashSet<int> contextualKeys = new HashSet<int>();
         private static readonly AutosaveSchedule autosave = new AutosaveSchedule();
         private static readonly global::System.Diagnostics.Stopwatch playClock = global::System.Diagnostics.Stopwatch.StartNew();
         [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
@@ -39,7 +40,12 @@ namespace TABQoL
             Ui.CheckKeyCapture();
             uint process;
             GetWindowThreadProcessId(GetForegroundWindow(), out process);
-            if (process != (uint)global::System.Diagnostics.Process.GetCurrentProcess().Id) { heldKeys.Clear(); return; }
+            if (process != (uint)global::System.Diagnostics.Process.GetCurrentProcess().Id)
+            {
+                heldKeys.Clear();
+                contextualKeys.Clear();
+                return;
+            }
             var keys = Ui.CaptureKey != null ? Enumerable.Range(8, 247) : Config.GlobalKeys().AsEnumerable();
             foreach (int key in keys)
             {
@@ -257,14 +263,24 @@ namespace TABQoL
 
         public static bool BuildingKeyDown(object system, int key)
         {
-            try { return initialized && (Ui.CaptureKey != null || Config.GlobalKeys().Contains(key) || BuildingHotkeys.OnKey(system, key)); }
+            try
+            {
+                if (!initialized) return false;
+                if (Ui.CaptureKey != null || Config.GlobalKeys().Contains(key)) return true;
+                if (!BuildingHotkeys.OnKey(system, key)) return false;
+                contextualKeys.Add(key);
+                return true;
+            }
             catch (Exception ex) { Log(ex); return false; }
         }
 
         public static bool GlobalKeyUp(object game, int key)
         {
             if (!initialized) return false;
-            if (Ui.CaptureKey == null && !Config.GlobalKeys().Contains(key)) return false;
+            // A contextual command can change the selection on key-down. Keep
+            // its matching release away from native global key-up actions.
+            bool contextual = contextualKeys.Remove(key);
+            if (Ui.CaptureKey == null && !Config.GlobalKeys().Contains(key)) return contextual;
             OnKey(Game, key);
             return true;
         }
