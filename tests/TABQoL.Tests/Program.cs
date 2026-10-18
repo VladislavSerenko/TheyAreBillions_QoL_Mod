@@ -80,6 +80,21 @@ internal static class Program
     {
         using (var module = ModuleDefMD.Load(executable))
         {
+            var meters = module.Types.Single(t => t.FullName == "ZX.Components.CLife").Methods
+                .Single(m => m.Name == Compatibility.Symbol(Compatibility.LifeMeters, steam));
+            Check(meters.IsStatic && meters.HasBody && meters.MethodSig.RetType.FullName == "System.Void" &&
+                meters.MethodSig.Params.Count == 1 && meters.MethodSig.Params[0].FullName == "System.Boolean",
+                (steam ? "Steam" : "GOG") + " native health-bar hook targets the static boolean setter");
+            if (patched)
+            {
+                meters.Body.SimplifyMacros(meters.Parameters);
+                var prefix = meters.Body.Instructions;
+                Check(prefix[0].OpCode == OpCodes.Ldarg && ReferenceEquals(prefix[0].Operand, meters.Parameters[0]) &&
+                    prefix[1].OpCode == OpCodes.Call && prefix[1].Operand is IMethod healthHook && healthHook.Name == "HealthBarsRequested" &&
+                    healthHook.DeclaringType.FullName == typeof(Bridge).FullName && healthHook.MethodSig.RetType.FullName == "System.Boolean" &&
+                    prefix[2].OpCode == OpCodes.Starg && ReferenceEquals(prefix[2].Operand, meters.Parameters[0]),
+                    "GOG health-bar prefix transforms the argument before native visibility handling");
+            }
             var mission = module.Types.Single(t => t.FullName == Compatibility.Symbol(Compatibility.MissionSystem, steam));
             var activate = mission.Methods.Single(m => m.Name == Compatibility.Symbol("#=zEHnEwyMK7mIMOOClaw==", steam));
             Check(!activate.IsStatic && activate.HasBody && activate.MethodSig.RetType.FullName == "System.Void" &&
@@ -236,19 +251,35 @@ internal static class Program
             Check(settings.CheatsKey == 123 && settings.MenuKey == 122 && settings.AutosaveMinutes == 10 && settings.BuildingKeys.Count == 0 && settings.Speed == 2, "old defaults migrate to F11 and ten-minute autosaves");
             File.WriteAllText(settingsPath, "<Settings><MenuKey>117</MenuKey><Speed>1</Speed></Settings>");
             Check(Settings.Read(settingsPath).MenuKey == 117, "custom menu binding survives migration");
+            Check(settings.HealthBarsKey == 119 && !settings.HealthBarsVisible && settings.GlobalKeys().Length == 7,
+                "health bars default to an independent F8 toggle without enabling the display");
+            File.WriteAllText(settingsPath, "<Settings><SettingsVersion>3</SettingsVersion><MenuKey>119</MenuKey></Settings>");
+            var migrated = Settings.Read(settingsPath);
+            Check(migrated.MenuKey == 119 && migrated.HealthBarsKey != 119 && migrated.GlobalKeys().Distinct().Count() == 7,
+                "existing F8 binding survives upgrade and gets a free health-bar key");
+            migrated.HealthBarsKey = 118;
+            migrated.HealthBarsVisible = true;
+            migrated.Write(settingsPath);
+            Check(Settings.Read(settingsPath).HealthBarsVisible && Settings.Read(settingsPath).HealthBarsKey == 118,
+                "health-bar display and custom binding survive settings reload");
+            Check(Throws<InvalidDataException>(() => new Settings { HealthBarsKey = 116 }.Validate()),
+                "health-bar shortcut cannot replace another QoL command");
+            Check(Bridge.HealthBarsRequested(true) && !Bridge.HealthBarsRequested(false),
+                "health-bar hook preserves native visibility before runtime initialization");
             Check(Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = -1 }.Validate()) &&
                 Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = 1441 }.Validate()), "autosave interval bounds enforced");
             Check(Policy.GridKey(1) == 'Q' && Policy.GridKey(2) == 'W' && Policy.GridKey(5) == 'T' && Policy.GridKey(6) == 'A' && Policy.GridKey(15) == 'B' && Policy.GridKey(0) == 0, "command grid follows QWERT, ASDFG, ZXCVB");
             BuildingBindingValidation();
             TrainingActivationTests.Run(Check);
+            AutosaveReloadTests.Run(Check);
             var schedule = new AutosaveSchedule();
             Check(!schedule.Tick(0, true, 1), "autosave does not fire immediately");
             for (int second = 1; second < 30; second++) schedule.Tick(second, true, 1);
             for (int second = 30; second < 90; second++) schedule.Tick(second, false, 1);
-            Check(!schedule.Tick(90, true, 1), "paused or modal time excluded from autosave timer");
+            Check(!schedule.Tick(90, true, 1), "loading or modal time excluded from autosave timer");
             bool due = false;
             for (int second = 91; second <= 120; second++) due = schedule.Tick(second, true, 1);
-            Check(due, "autosave becomes due after sixty seconds of active play");
+            Check(due, "autosave becomes due after sixty seconds of eligible mission time");
             schedule.Completed();
             Check(!schedule.Tick(500, true, 1), "no catch-up save after a suspended process");
             schedule.Reset();
@@ -365,7 +396,7 @@ internal static class Program
                 CommandActivationTarget(prepared, false, true);
                 Patcher.VerifyMetadata(original, prepared);
                 Check(true, "original metadata token identities preserved");
-                Check(File.Exists(prepared), "actual " + Compatibility.VersionFor(originalHash) + " patched and all ten hook names verified");
+                Check(File.Exists(prepared), "actual " + Compatibility.VersionFor(originalHash) + " patched and all eleven hook names verified");
                 Check(SnapshotStore.Hash(original) == originalHash, "original EXE unchanged");
                 Check(Throws<InvalidDataException>(() => Patcher.Prepare(prepared, Path.Combine(root, "double.exe"))), "double patch rejected");
             }

@@ -1,4 +1,47 @@
-# Validation — 0.3.2
+# Validation — 0.3.3
+
+## 0.3.3 verification
+
+This update adds a persistent, rebindable native health-bar toggle (F8 by
+default). It also fixes autosave starvation during repeated quickloads or
+restarts of the same mission. Ordinary planning pauses now count toward the
+interval; modal menus, loading and long process suspensions do not.
+
+The clean build passes **130 checks with both supported original executables
+supplied**, with **zero warnings and errors**. **100 checks** run without game
+files. New coverage includes legacy hotkey migration and conflicts, health-bar
+settings persistence, native setter signatures and GOG hook argument handling,
+and a simulated two-hour session with a reload every two minutes. That session
+produces eleven ten-minute autosaves after excluding its loading periods.
+
+Native checks on 2026-10-18 use separately named disposable mission copies:
+
+| Feature | Confirmed behavior |
+| --- | --- |
+| Steam health bars | Physical F8 shows native bars on visible units and buildings while paused; another F8 restores the normal display |
+| GOG health bars | Physical F8 shows native bars while paused; rebinding to F7 in Settings and pressing F7 restores the normal display |
+| Reloads | Both editions retain the toggle and accumulated autosave time through a quickload of the same mission |
+| Paused autosaves | Both editions produce real native saves at one-minute test intervals while continuously paused; five history slots fill and the oldest is replaced |
+| Autosave loading | Both editions successfully load a generated autosave into the disposable mission |
+| Settings layout | Reviewed native Steam and GOG captures show the seventh hotkey row and autosave dropdown without overlapping the action buttons |
+| Clean installations | Both editions pass startup, physical F11, Settings and OK smoke checks after removing the private diagnostic helper |
+
+Both installations pass installer inspection and contain the clean release
+runtime DLL. The diagnostic helper and its frame call are absent from the
+source and release DLL. The original Steam EXE remains byte-for-byte unchanged.
+After removing six task-owned save/checksum files and two disposable snapshot
+scopes, all **72 baseline save/cloud files** match their pre-test SHA-256 hashes.
+The original `Settings.xml` also matches exactly, preserving the ten-minute
+interval and existing preferences. Installation backup archives are retained.
+
+The one-minute integration interval advances naturally; the scheduler is not
+primed. The default remains ten minutes. The native held health-bar key is
+preserved by forwarding its requested value when the toggle is off; that
+specific held-key interaction was not separately exercised in these checks.
+Other zoom levels, native key conflicts and combinations with other mods have
+not been exhaustively tested.
+
+The completed 0.3.2 and earlier results below are historical coverage.
 
 ## 0.3.2 verification
 

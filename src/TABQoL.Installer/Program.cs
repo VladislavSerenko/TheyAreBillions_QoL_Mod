@@ -129,7 +129,7 @@ namespace TABQoL.Installer
                 File.Replace(staged, exe, null);
                 committed = true;
                 Console.WriteLine("Installed TAB QoL for " + Compatibility.VersionFor(originalHash) + ".");
-                Console.WriteLine("F5 save, F9 load, [ slower, ] faster, F11 menu, F12 debug cheats. Options > TAB QoL.");
+                Console.WriteLine("F5 save, F9 load, F8 health bars, [ slower, ] faster, F11 menu, F12 debug cheats. Options > TAB QoL.");
                 Console.WriteLine("Original EXE: " + original);
             }
             finally
@@ -240,7 +240,7 @@ namespace TABQoL.Installer
                 else File.Move(staged, config);
                 committed = true;
                 Console.WriteLine("Installed TAB QoL for " + Compatibility.SteamVersion + " using the startup config.");
-                Console.WriteLine("Steam EXE is unchanged. F11 menu, F5 save, F9 load, F12 debug cheats. Options > TAB QoL.");
+                Console.WriteLine("Steam EXE is unchanged. F11 menu, F5 save, F9 load, F8 health bars, F12 debug cheats. Options > TAB QoL.");
                 Console.WriteLine("Original EXE/config backup: " + originalDirectory);
             }
             finally

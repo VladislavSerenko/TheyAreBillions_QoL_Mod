@@ -189,7 +189,7 @@ namespace TABQoL
                     Reflect.Set(load, "Enabled", true);
                 });
             }
-            if (page == 2) Add(content, Label("Five rotating autosaves. Interval: " + (Bridge.Config.AutosaveMinutes == 0 ? "off" : Bridge.Config.AutosaveMinutes + " min of active play") + ".\nChange the interval in Options > TAB QoL.", width, ContentAlignment.TopCenter), 0, 334 * u, width, 60 * u);
+            if (page == 2) Add(content, Label("Five rotating autosaves. Interval: " + (Bridge.Config.AutosaveMinutes == 0 ? "off" : Bridge.Config.AutosaveMinutes + " min, including pauses") + ".\nQuickloads keep the timer. Loading and menus do not count.", width, ContentAlignment.TopCenter), 0, 334 * u, width, 60 * u);
             Show(window);
         }
 
@@ -266,7 +266,7 @@ namespace TABQoL
         {
             if (width == 0) width = (float)Reflect.Get(content, "Width");
             float u = Unit;
-            const float rowHeight = 34;
+            const float rowHeight = 30;
             float fieldX = width * 0.5f, fieldWidth = width * 0.48f, controlHeight = 22 * u;
             Add(content, Label("Simulation speed", width * 0.48f, ContentAlignment.MiddleLeft), 0, 0, width * 0.48f, controlHeight);
             var speedBox = Reflect.New("ZX.GUI.ZXComboBox");
@@ -278,9 +278,9 @@ namespace TABQoL
                 int selected = (int)Reflect.Get(speedBox, "SelectedIndex");
                 if (selected >= 0 && selected < Policy.Speeds.Length) Bridge.SetSpeed(Policy.Speeds[selected]);
             }));
-            string[] names = { "Quick save", "Quick load", "Slower", "Faster", "QoL menu", "Debug cheats" };
-            Func<int>[] getters = { () => Bridge.Config.QuickSaveKey, () => Bridge.Config.QuickLoadKey, () => Bridge.Config.SlowerKey, () => Bridge.Config.FasterKey, () => Bridge.Config.MenuKey, () => Bridge.Config.CheatsKey };
-            Action<int>[] setters = { k => Bridge.Config.QuickSaveKey = k, k => Bridge.Config.QuickLoadKey = k, k => Bridge.Config.SlowerKey = k, k => Bridge.Config.FasterKey = k, k => Bridge.Config.MenuKey = k, k => Bridge.Config.CheatsKey = k };
+            string[] names = { "Quick save", "Quick load", "Slower", "Faster", "QoL menu", "Debug cheats", "Toggle health bars" };
+            Func<int>[] getters = { () => Bridge.Config.QuickSaveKey, () => Bridge.Config.QuickLoadKey, () => Bridge.Config.SlowerKey, () => Bridge.Config.FasterKey, () => Bridge.Config.MenuKey, () => Bridge.Config.CheatsKey, () => Bridge.Config.HealthBarsKey };
+            Action<int>[] setters = { k => Bridge.Config.QuickSaveKey = k, k => Bridge.Config.QuickLoadKey = k, k => Bridge.Config.SlowerKey = k, k => Bridge.Config.FasterKey = k, k => Bridge.Config.MenuKey = k, k => Bridge.Config.CheatsKey = k, k => Bridge.Config.HealthBarsKey = k };
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
@@ -308,8 +308,8 @@ namespace TABQoL
                 });
                 Reflect.Set(button, "Height", controlHeight);
             }
-            float autosaveY = rowHeight * 7 * u;
-            Add(content, Label("Autosave interval (active play)", width * 0.48f, ContentAlignment.MiddleLeft), 0, autosaveY, width * 0.48f, controlHeight);
+            float autosaveY = rowHeight * 8 * u;
+            Add(content, Label("Autosave (including pauses)", width * 0.48f, ContentAlignment.MiddleLeft), 0, autosaveY, width * 0.48f, controlHeight);
             var autosaveBox = Reflect.New("ZX.GUI.ZXComboBox");
             var intervals = new[] { 0 }.Concat(Enumerable.Range(1, 12).Select(i => i * 5)).ToList();
             // Keep an existing custom interval visible until the player chooses

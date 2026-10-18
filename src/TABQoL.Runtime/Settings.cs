@@ -17,11 +17,13 @@ namespace TABQoL
         public int FasterKey { get; set; } = 221;
         public int MenuKey { get; set; } = 122;
         public int CheatsKey { get; set; } = 123;
+        public int HealthBarsKey { get; set; } = 119;
+        public bool HealthBarsVisible { get; set; }
         public int SettingsVersion { get; set; }
         public int AutosaveMinutes { get; set; } = 10;
         public List<BuildingBinding> BuildingKeys { get; set; } = new List<BuildingBinding>();
 
-        public int[] GlobalKeys() { return new[] { QuickSaveKey, QuickLoadKey, SlowerKey, FasterKey, MenuKey, CheatsKey }; }
+        public int[] GlobalKeys() { return new[] { QuickSaveKey, QuickLoadKey, SlowerKey, FasterKey, MenuKey, CheatsKey, HealthBarsKey }; }
 
         public void Validate()
         {
@@ -54,7 +56,15 @@ namespace TABQoL
                 if (settings.SettingsVersion < 3 && settings.MenuKey == 121 &&
                     !new[] { settings.QuickSaveKey, settings.QuickLoadKey, settings.SlowerKey, settings.FasterKey, settings.CheatsKey }.Contains(122))
                     settings.MenuKey = 122;
-                settings.SettingsVersion = 3;
+                if (settings.SettingsVersion < 4)
+                {
+                    var used = new[] { settings.QuickSaveKey, settings.QuickLoadKey, settings.SlowerKey, settings.FasterKey, settings.MenuKey, settings.CheatsKey }
+                        .Concat((settings.BuildingKeys ?? new List<BuildingBinding>()).Where(b => b != null).Select(b => b.Key)).ToArray();
+                    if (used.Contains(settings.HealthBarsKey))
+                        settings.HealthBarsKey = Enumerable.Range(112, 24).Concat(Enumerable.Range(8, 247))
+                            .First(k => BindableKey(k) && !used.Contains(k));
+                }
+                settings.SettingsVersion = 4;
                 settings.Validate();
                 return settings;
             }
@@ -62,7 +72,7 @@ namespace TABQoL
 
         public void Write(string path)
         {
-            SettingsVersion = 3;
+            SettingsVersion = 4;
             Validate();
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             string pending = path + ".new";

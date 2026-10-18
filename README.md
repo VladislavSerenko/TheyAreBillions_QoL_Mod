@@ -12,7 +12,7 @@ needed. Follow the [installation steps](#install-steam-and-gog) below.
 
 ## Supported versions
 
-Version 0.3.2 supports **Steam and GOG x64** for the exact builds below.
+Version 0.3.3 supports **Steam and GOG x64** for the exact builds below.
 See [tested behavior and limits](VALIDATION.md). The installer detects the
 edition from the original `TheyAreBillions.exe` SHA-256:
 
@@ -30,7 +30,7 @@ normally with its own dependencies installed.
 
 ## Install (Steam and GOG)
 
-Download the ready-to-install **`TABQoL-0.3.2.zip`** from
+Download the ready-to-install **`TABQoL-0.3.3.zip`** from
 [Releases](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/releases),
 under **Assets**. The **Source code** archives and **Code > Download ZIP** contain
 project source files without the ready-to-run installer.
@@ -38,8 +38,8 @@ project source files without the ready-to-run installer.
 If no release is listed yet, download the current build from
 [Actions > Build and test](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/actions/workflows/build.yml?query=branch%3Amain).
 Sign in to GitHub, open the latest successful run on **main**, scroll to
-**Artifacts**, and download **TABQoL-0.3.2**. This download may contain another
-`TABQoL-0.3.2.zip`; extract that ZIP too.
+**Artifacts**, and download **TABQoL-0.3.3**. This download may contain another
+`TABQoL-0.3.3.zip`; extract that ZIP too.
 
 1. **Close the game.** Extract all files into a separate folder. You should see
    `TABQoL.Installer.exe` alongside the included DLL files. Keep them together.
@@ -86,6 +86,7 @@ For removal and upgrade steps, see [Uninstall or update](#uninstall-or-update).
 | --- | --- |
 | Quick save | F5 |
 | Quick load | F9 |
+| Toggle health bars | F8 |
 | Slower | `[` |
 | Faster | `]` |
 | QoL menu | F11 |
@@ -107,6 +108,15 @@ Save/Load pages stays within that screen.
 In native Options, the four QoL actions align with the Cancel/Apply columns
 when the tab becomes visible and after switching tabs.
 
+### Health bars
+
+Press **F8** once to keep native health bars visible and again to restore the
+normal display. The toggle covers visible units, enemies and buildings, and
+works while paused. Rebind **Toggle health bars** in **Options > TAB QoL**.
+Its state and key are saved between sessions; the game's held health-bar key
+still works when the toggle is off. Existing custom bindings are preserved;
+if F8 is already assigned, upgrading chooses an available key for the toggle.
+
 ### Mission saves
 
 F5/F9 use the quick slot. **F11 > Save / Load** provides that slot and **ten
@@ -126,15 +136,18 @@ Snapshots remain separate from the game's ordinary saves. Each slot retains
 its current and previous generation; SHA-256 hashes are checked before loading.
 Slots from completed/abandoned games remain on disk until you remove them.
 
-Autosave defaults to **every 10 minutes of active real play**. In
+Autosave defaults to **every 10 real minutes in the loaded mission, including
+ordinary pauses**. In
 **Options > TAB QoL**, choose **Off** or **5, 10, 15, …, 60 minutes**.
 A custom interval saved by an older version stays visible and unchanged until
 you select a preset.
-Paused time, modal menus and loading do not count; game speed does not change
-the interval. Five slots retain the last five autosaves (about 50 minutes at
-the default interval). The oldest is replaced next. Quick/manual saves are
-independent. The timer restarts after a mission load or interval change;
-missed saves during a long suspension are not queued.
+Modal menus, loading and long process suspensions do not count; game speed
+does not change the interval. Five slots retain the last five autosaves
+(about 50 minutes at the default interval). The oldest is replaced next.
+Quick/manual saves are independent. Quickloads and restarts of the same
+mission retain the countdown, so repeated attempts cannot postpone autosaves
+indefinitely. A different mission, interval change or game restart starts a
+fresh countdown; missed saves during a long suspension are not queued.
 
 ### Building hotkeys
 
@@ -261,8 +274,8 @@ On Windows with the .NET SDK 8 or newer:
 
 The release ZIP is written to `artifacts`. NuGet restores dnlib 4.5.0,
 Lib.Harmony 2.4.1 and .NET Framework reference assemblies. No game assemblies
-are required to compile. The clean **0.3.2** build passes **112 checks with both
-supported originals supplied**; **85 checks** do not require game files.
+are required to compile. The clean **0.3.3** build passes **130 checks with both
+supported originals supplied**; **100 checks** do not require game files.
 Native verification is tracked in [VALIDATION.md](VALIDATION.md). The checks cover settings,
 autosave timing, command-grid mapping, slot isolation/retention, checksum
 rejection, interrupted writes and startup config preservation. With

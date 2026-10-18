@@ -67,6 +67,9 @@ namespace TABQoL.Installer
                         Instruction.Create(OpCodes.Brfalse, entry), Instruction.Create(OpCodes.Ldc_I4_1), Instruction.Create(OpCodes.Ret));
                 }
                 var life = module.Types.Single(t => t.FullName == "ZX.Components.CLife");
+                var meters = Get(life, Compatibility.LifeMeters);
+                Prefix(meters, Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Call, Hook("HealthBarsRequested")),
+                    Instruction.Create(OpCodes.Starg, meters.Parameters[0]));
                 foreach (string name in new[] { "#=zG9K55tU=", "#=z9SDftOMfXc1$" })
                 {
                     var damage = Get(life, name);
@@ -124,7 +127,7 @@ namespace TABQoL.Installer
                     foreach (var nested in type.NestedTypes) Scan(nested);
                 }
                 foreach (var type in module.Types) Scan(type);
-                string[] expected = { "OnFrame", "WorldShown", "WorldDisposed", "TrySkipHero", "OptionsCreated", "CommandRefreshing", "CommandActivating", "BuildingKeyDown", "IgnoreDamage", "GlobalKeyUp" };
+                string[] expected = { "OnFrame", "WorldShown", "WorldDisposed", "TrySkipHero", "OptionsCreated", "CommandRefreshing", "CommandActivating", "BuildingKeyDown", "IgnoreDamage", "GlobalKeyUp", "HealthBarsRequested" };
                 if (!hooks.SetEquals(expected)) throw new InvalidDataException("Patched hook verification failed.");
             }
         }

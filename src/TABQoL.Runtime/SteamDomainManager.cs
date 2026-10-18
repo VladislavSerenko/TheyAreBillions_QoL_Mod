@@ -164,7 +164,8 @@ namespace TABQoL
                     Method(Type("ZX.Components.CLife"), "#=zG9K55tU="), Method(Type("ZX.Components.CLife"), "#=z9SDftOMfXc1$"),
                     Method(world, Compatibility.ShowWorld), Method(world, "OnDispose"),
                     Method(closure, Compatibility.StartMission), Method(game, Compatibility.Options),
-                    Method(mission, "#=zEHnEwyMK7mIMOOClaw==")
+                    Method(mission, "#=zEHnEwyMK7mIMOOClaw=="),
+                    Method(Type("ZX.Components.CLife"), Compatibility.LifeMeters)
                 };
                 harmony.Patch(targets[0], prefix: Hook(nameof(Command)));
                 harmony.Patch(targets[1], prefix: Hook(nameof(KeyDown)));
@@ -177,6 +178,7 @@ namespace TABQoL
                 harmony.Patch(targets[8], prefix: Hook(nameof(StartHero)));
                 harmony.Patch(targets[9], transpiler: Hook(nameof(Options)));
                 harmony.Patch(targets[10], prefix: Hook(nameof(Activate)));
+                harmony.Patch(targets[11], prefix: Hook(nameof(LifeMeters)));
                 Volatile.Write(ref hookState, 2);
                 Log("Steam runtime hooks installed.");
             }
@@ -194,6 +196,7 @@ namespace TABQoL
         }
 
         private static void Command(object __instance) { if (HooksEnabled) Bridge.CommandRefreshing(__instance); }
+        private static void LifeMeters(ref bool __0) { if (HooksEnabled) __0 = Bridge.HealthBarsRequested(__0); }
         private static bool Activate(object __instance, object[] __args)
         {
             return !HooksEnabled || !Bridge.CommandActivating(__instance, __args[0]);

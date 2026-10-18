@@ -44,5 +44,6 @@ namespace TABQoL
         public const string Fonts = "#=zqZKzsA47yWa6+#=zz8951q8=";
         public const string BodyFont = "#=z7HoVskmyZLzk";
         public const string Notify = "#=z8OaGcNk=";
+        public const string LifeMeters = "#=zmObRylW7HuR6ZJIz_dWqfbw=";
     }
 }

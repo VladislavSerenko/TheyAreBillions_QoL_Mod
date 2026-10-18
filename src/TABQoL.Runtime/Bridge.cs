@@ -109,7 +109,7 @@ namespace TABQoL
                     if (!ReferenceEquals(previousLevel, Level))
                     {
                         Cheats.Reset();
-                        autosave.Reset();
+                        autosave.EnterMission(Scope());
                         if (loadSourceLevel != null && !ReferenceEquals(loadSourceLevel, Level))
                         {
                             Reflect.Set(Game, "Paused", loadPaused);
@@ -123,7 +123,7 @@ namespace TABQoL
                 }
                 else if (!InMission) Cheats.Reset();
                 bool eligible = InMission && Ready && !busy && pending == null &&
-                    !(bool)Reflect.Get(Game, "Paused") && Reflect.Get(Level, "EndStatus").ToString() == "Playing" &&
+                    Reflect.Get(Level, "EndStatus").ToString() == "Playing" &&
                     !(bool)Reflect.Get(Reflect.Type("DXVision.GUI.DXModalScreen"), "IsInModal");
                 if (autosave.Tick(playClock.Elapsed.TotalSeconds, eligible, Config.AutosaveMinutes))
                 {
@@ -156,7 +156,15 @@ namespace TABQoL
                     return true;
                 }
                 if (!InMission || (bool)Reflect.Get(Reflect.Type("DXVision.GUI.DXModalScreen"), "IsInModal")) return false;
-                if (key == Config.QuickSaveKey) Queue(() => Save("quick"));
+                if (key == Config.HealthBarsKey)
+                {
+                    bool previous = Config.HealthBarsVisible;
+                    Config.HealthBarsVisible = !previous;
+                    try { PersistSettings(); }
+                    catch { Config.HealthBarsVisible = previous; throw; }
+                    Notify("Health bars: " + (Config.HealthBarsVisible ? "on" : "off"));
+                }
+                else if (key == Config.QuickSaveKey) Queue(() => Save("quick"));
                 else if (key == Config.QuickLoadKey) Queue(() => Load("quick"));
                 else
                 {
@@ -227,6 +235,7 @@ namespace TABQoL
                 stagedLoad = null;
             }
             string path = Store.StageLoad(Scope(), slot, Saves);
+            Log("Loading snapshot: " + slot + "; keeping this mission's autosave countdown.");
             loadSourceLevel = Level;
             loadPaused = (bool)Reflect.Get(Game, "Paused");
             Ui.CloseModWindows();
@@ -254,6 +263,13 @@ namespace TABQoL
         }
 
         internal static void PersistSettings() { BuildingHotkeys.Validate(); Config.Write(Path.Combine(DataDirectory, "Settings.xml")); }
+
+        public static bool HealthBarsRequested(bool native)
+        {
+            if (native || !initialized || Config == null || !Config.HealthBarsVisible) return native;
+            try { return InMission && Ready; }
+            catch (Exception ex) { Log(ex); return native; }
+        }
 
         public static void CommandRefreshing(object control)
         {
