@@ -1,4 +1,14 @@
-# Validation — 0.3.3
+# Validation — 0.3.4
+
+## 0.3.4 documentation update
+
+The README and installation documentation are now English only. The Russian
+README and its links have been removed from the repository and release
+packages. Packaging checks verify the installer and source archive contents.
+
+Runtime and installer source code are identical to 0.3.3; its automated and
+native verification is recorded below. Version references and documentation
+packaging are the only changes in this release.
 
 ## 0.3.3 verification
 

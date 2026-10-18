@@ -1,7 +1,5 @@
 # TAB QoL — They Are Billions
 
-[Русская инструкция](README.ru.md)
-
 An unofficial Windows mod with mission save/load slots, campaign research
 reset, optional hero mission skipping with full rewards, and adjustable
 simulation speed, building hotkeys and an F12 debug cheat panel. It installs
@@ -12,7 +10,7 @@ needed. Follow the [installation steps](#install-steam-and-gog) below.
 
 ## Supported versions
 
-Version 0.3.3 supports **Steam and GOG x64** for the exact builds below.
+Version 0.3.4 supports **Steam and GOG x64** for the exact builds below.
 See [tested behavior and limits](VALIDATION.md). The installer detects the
 edition from the original `TheyAreBillions.exe` SHA-256:
 
@@ -30,7 +28,7 @@ normally with its own dependencies installed.
 
 ## Install (Steam and GOG)
 
-Download the ready-to-install **`TABQoL-0.3.3.zip`** from
+Download the ready-to-install **`TABQoL-0.3.4.zip`** from
 [Releases](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/releases),
 under **Assets**. The **Source code** archives and **Code > Download ZIP** contain
 project source files without the ready-to-run installer.
@@ -38,8 +36,8 @@ project source files without the ready-to-run installer.
 If no release is listed yet, download the current build from
 [Actions > Build and test](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/actions/workflows/build.yml?query=branch%3Amain).
 Sign in to GitHub, open the latest successful run on **main**, scroll to
-**Artifacts**, and download **TABQoL-0.3.3**. This download may contain another
-`TABQoL-0.3.3.zip`; extract that ZIP too.
+**Artifacts**, and download **TABQoL-0.3.4**. This download may contain another
+`TABQoL-0.3.4.zip`; extract that ZIP too.
 
 1. **Close the game.** Extract all files into a separate folder. You should see
    `TABQoL.Installer.exe` alongside the included DLL files. Keep them together.
