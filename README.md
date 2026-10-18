@@ -7,6 +7,9 @@ reset, optional hero mission skipping with full rewards, and adjustable
 simulation speed, building hotkeys and an F12 debug cheat panel. It installs
 into your own local copy of the game.
 
+**Steam and GOG use the same installer.** No branch switching or compilation is
+needed. Follow the [installation steps](#install-steam-and-gog) below.
+
 ## Supported versions
 
 Version 0.3.2 supports **Steam and GOG x64** for the exact builds below.
@@ -25,33 +28,57 @@ their displayed version matches. Steam updates may require a new adapter.
 Requires Windows and .NET Framework 4.6.2 or newer. The game must already run
 normally with its own dependencies installed.
 
-## Install
+## Install (Steam and GOG)
 
-1. Close the game. Extract `TABQoL-0.3.2.zip` into a separate folder.
-2. Open PowerShell in the extracted folder and run:
+Download the ready-to-install **`TABQoL-0.3.2.zip`** from
+[Releases](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/releases),
+under **Assets**. The **Source code** archives and **Code > Download ZIP** contain
+project source files without the ready-to-run installer.
+
+If no release is listed yet, download the current build from
+[Actions > Build and test](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/actions/workflows/build.yml?query=branch%3Amain).
+Sign in to GitHub, open the latest successful run on **main**, scroll to
+**Artifacts**, and download **TABQoL-0.3.2**. This download may contain another
+`TABQoL-0.3.2.zip`; extract that ZIP too.
+
+1. **Close the game.** Extract all files into a separate folder. You should see
+   `TABQoL.Installer.exe` alongside the included DLL files. Keep them together.
+2. **Find your game folder** containing `TheyAreBillions.exe`:
+
+   - **Steam:** Library > right-click They Are Billions > Manage > Browse local files.
+   - **GOG Galaxy:** select the game > menu beside Play > Manage installation > Show folder.
+
+3. **Open PowerShell in the extracted mod folder.** Open that folder in File
+   Explorer, type `powershell` into the address bar, and press Enter.
+4. **Run the installer.** Replace `GAME_FOLDER` with the full game folder path
+   from step 2, keeping the quotation marks:
 
    ```powershell
-   .\TABQoL.Installer.exe inspect 'C:\Games\Steam\steamapps\common\They Are Billions'
-   .\Install.ps1 -GameDirectory 'C:\Games\Steam\steamapps\common\They Are Billions'
+   .\TABQoL.Installer.exe install "GAME_FOLDER"
    ```
 
-   For GOG, use its directory, for example `C:\Games\They Are Billions`.
-   You can also invoke `TABQoL.Installer.exe install '<game-directory>'` directly.
-   Administrator privileges are needed only if Windows requires them to write
-   to your game directory.
-3. Launch the game normally (through Steam for the Steam edition). Open
-   **Options > TAB QoL** or press **F11**.
+   For example, if your game is installed in `C:\Games\They Are Billions`:
 
-The installer backs up the original EXE and user save files. **Steam keeps the
-original EXE unchanged:** a CLR AppDomainManager entry in
-`TheyAreBillions.exe.config` loads the runtime, which uses Harmony to install
-hooks in memory. Existing startup/runtime options are preserved. **GOG uses a
-dnlib patch of the supported EXE.** See [installation modes](INSTALLATION.md).
+   ```powershell
+   .\TABQoL.Installer.exe install "C:\Games\They Are Billions"
+   ```
 
-Keep `TABQoL.Installation` in the game directory for uninstall. Uninstall the
-previous mod version before upgrading or updating/verifying the game in Steam.
-Installation refuses a startup config that already selects another
-AppDomainManager and refuses to overwrite unowned mod DLLs.
+   Use your own path for either edition. The installer detects Steam or GOG
+   automatically. Wait for it to report success before launching the game.
+5. **Launch the game normally**, through Steam for the Steam edition. Press
+   **F11** or open **Options > TAB QoL**.
+
+If Windows reports **Access denied**, open PowerShell as administrator, return
+to the extracted mod folder, and retry. Administrator privileges are needed
+only when Windows blocks writing to your game folder.
+
+The installer backs up the original game files and user saves. Keep the
+`TABQoL.Installation` folder inside your game directory for uninstall.
+Steam keeps its original EXE unchanged; GOG installation patches the supported
+EXE. See [installation modes](INSTALLATION.md) for technical details and
+compatibility restrictions.
+
+For removal and upgrade steps, see [Uninstall or update](#uninstall-or-update).
 
 ## Controls
 
@@ -202,14 +229,17 @@ If installation fails, inspect the error and any retained
 `TABQoL.Installation` directory before retrying. Do not overwrite files that
 have subsequently been changed by the game store or another mod.
 
-## Uninstall
+## Uninstall or update
 
-Close the game and run:
+Close the game. Open PowerShell in the extracted mod folder as above and run
+the command below, replacing `GAME_FOLDER` with your game folder path:
 
 ```powershell
-.\Uninstall.ps1 -GameDirectory 'C:\Games\They Are Billions'
-# Or: .\TABQoL.Installer.exe uninstall 'C:\Games\They Are Billions'
+.\TABQoL.Installer.exe uninstall "GAME_FOLDER"
 ```
+
+Uninstall the previous mod version before installing a newer one or
+updating/verifying the game in Steam.
 
 Uninstall verifies owned-file and backup hashes before making changes. For
 Steam it restores the exact original config, or removes the config if none
