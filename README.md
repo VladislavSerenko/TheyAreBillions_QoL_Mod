@@ -9,7 +9,7 @@ into your own local copy of the game.
 
 ## Supported versions
 
-Version 0.3.0 supports **Steam and GOG x64** for the exact builds below.
+Version 0.3.1 supports **Steam and GOG x64** for the exact builds below.
 See [tested behavior and limits](VALIDATION.md). The installer detects the
 edition from the original `TheyAreBillions.exe` SHA-256:
 
@@ -27,7 +27,7 @@ normally with its own dependencies installed.
 
 ## Install
 
-1. Close the game. Extract `TABQoL-0.3.0.zip` into a separate folder.
+1. Close the game. Extract `TABQoL-0.3.1.zip` into a separate folder.
 2. Open PowerShell in the extracted folder and run:
 
    ```powershell
@@ -74,6 +74,10 @@ The previous default F10 is migrated to F11 to avoid the game's image capture
 action. Custom menu bindings are preserved. The mod consumes its assigned keys
 before native special actions, including the game's F11 developer action.
 
+QoL windows use compact centered layouts with aligned controls and smaller
+brass action buttons. **OK** returns to the previous QoL screen. Changing
+Save/Load pages stays within that screen.
+
 ### Mission saves
 
 F5/F9 use the quick slot. **F11 > Save / Load** provides that slot and **ten
@@ -94,7 +98,9 @@ its current and previous generation; SHA-256 hashes are checked before loading.
 Slots from completed/abandoned games remain on disk until you remove them.
 
 Autosave defaults to **every 10 minutes of active real play**. In
-**Options > TAB QoL**, choose Off or an interval from 1 to 1440 minutes.
+**Options > TAB QoL**, choose **Off** or **5, 10, 15, …, 60 minutes**.
+A custom interval saved by an older version stays visible and unchanged until
+you select a preset.
 Paused time, modal menus and loading do not count; game speed does not change
 the interval. Five slots retain the last five autosaves (about 50 minutes at
 the default interval). The oldest is replaced next. Quick/manual saves are
@@ -103,21 +109,28 @@ missed saves during a long suspension are not queued.
 
 ### Building hotkeys
 
-The five command-center construction categories use **Q W E R T** in order.
 Select a player building and use **Q W E R T** for its top command row,
 **A S D F G** for the middle row, and **Z X C V B** for the bottom row.
-This covers individual buildings, barracks recruitment and other building
-commands. The default tent key is Q.
+Keys follow the actual icon positions, including the command-center category
+icons. This covers individual buildings, barracks recruitment and other building
+commands. Campaign unlocks can change which icons occupy each slot.
 Visible hints follow the current command grid. Native unlock, resource, queue
 and placement requirements still apply. Escape retains native Back/Cancel
 behavior. Unit selections keep their native keys.
+
+With multiple production buildings selected, a recruitment shortcut queues
+one unit in each eligible building. Each building uses the native resource,
+unlock and queue checks, so available resources can limit how many accept it.
 
 Open **F11 > Building hotkeys** or **Options > TAB QoL > Building hotkeys** to
 change each building key. Assign A–Z, Backspace to unbind, or Escape to cancel.
 Use different keys within a category; different categories may reuse a key.
 Building keys cannot overlap the mod's global hotkeys. Shift/Ctrl/Alt/Windows
 combinations do not activate construction shortcuts. Bindings persist in XML.
-Existing custom construction keys override the grid defaults.
+Unconfigured buildings show **Auto** and follow their visible icon slot.
+Existing custom construction keys are retained. A visible custom binding takes
+priority over an automatic shortcut using the same key; that automatic shortcut
+is suppressed to avoid triggering the wrong command.
 
 ### Debug cheats
 
@@ -128,7 +141,8 @@ to its native limits. Protection affects player entities only; enemies still
 take damage. Both protection switches default to off and reset after loading
 or changing missions. They are not stored in settings or snapshots.
 
-**Win current mission...** asks for confirmation inside the game, saves a
+**Fill resources** fills native storage. **Win mission...** asks for confirmation
+inside the game, saves a
 separate `before-cheat-win` snapshot, then runs the native victory sequence.
 Finish the normal result screen to apply campaign progress and rewards.
 To undo before leaving that screen, open **F11 > Save / Load** and load the
@@ -213,8 +227,9 @@ On Windows with the .NET SDK 8 or newer:
 
 The release ZIP is written to `artifacts`. NuGet restores dnlib 4.5.0,
 Lib.Harmony 2.4.1 and .NET Framework reference assemblies. No game assemblies
-are required to compile. **52 automated checks** run without game files;
-**75 pass with both supported originals supplied**. They cover settings,
+are required to compile. The clean **0.3.1** build passes **80 checks with both
+supported originals supplied**; 57 checks do not require game files.
+Native verification is tracked in [VALIDATION.md](VALIDATION.md). The checks cover settings,
 autosave timing, command-grid mapping, slot isolation/retention, checksum
 rejection, interrupted writes and startup config preservation. With
 `-OriginalExe`, they also verify GOG patch hooks/metadata and Steam

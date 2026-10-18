@@ -23,6 +23,57 @@ internal static class Program
         catch (T) { return true; }
     }
 
+    private static void BuildingBindingValidation()
+    {
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+        var configField = typeof(Bridge).GetField("Config", flags);
+        var hotkeys = typeof(Bridge).Assembly.GetType("TABQoL.BuildingHotkeys", true);
+        var entriesField = hotkeys.GetField("entries", flags);
+        var entryType = hotkeys.GetNestedType("Entry", System.Reflection.BindingFlags.NonPublic);
+        var validate = hotkeys.GetMethod("Validate", flags);
+        object previousConfig = configField.GetValue(null), previousEntries = entriesField.GetValue(null);
+        try
+        {
+            var entries = (System.Collections.IList)Activator.CreateInstance(entriesField.FieldType);
+            void Entry(string id, string category, int key)
+            {
+                var entry = Activator.CreateInstance(entryType, true);
+                foreach (var value in new[] { new { Name = "Id", Value = (object)id }, new { Name = "Category", Value = (object)category }, new { Name = "Key", Value = (object)key } })
+                    entryType.GetField(value.Name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(entry, value.Value);
+                entries.Add(entry);
+            }
+            bool Valid(Settings config)
+            {
+                configField.SetValue(null, config);
+                try { validate.Invoke(null, null); return true; }
+                catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is InvalidOperationException) { return false; }
+            }
+            Entry("auto-housing", "Housing", 'Q');
+            Entry("custom-housing", "Housing", 'Q');
+            Entry("custom-resources", "Resources", 'Q');
+            entriesField.SetValue(null, entries);
+            var settings = new Settings();
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-housing", Key = 'Q' });
+            Check(Valid(settings), "explicit construction binding can take an Auto grid key");
+            settings = new Settings { MenuKey = 'Q' };
+            Check(Valid(settings), "global shortcut can reserve a cached Auto grid key");
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-housing", Key = 'Q' });
+            Check(!Valid(settings), "explicit construction binding still conflicts with a global shortcut");
+            settings = new Settings();
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "auto-housing", Key = 'Q' });
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-housing", Key = 'Q' });
+            Check(!Valid(settings), "explicit construction bindings cannot repeat within a category");
+            settings.BuildingKeys.RemoveAt(0);
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-resources", Key = 'Q' });
+            Check(Valid(settings), "explicit construction bindings can repeat across categories");
+        }
+        finally
+        {
+            configField.SetValue(null, previousConfig);
+            entriesField.SetValue(null, previousEntries);
+        }
+    }
+
     private static void SteamLifecycle(string root, string original)
     {
         string game = Path.Combine(root, "SteamLifecycle");
@@ -115,6 +166,12 @@ internal static class Program
 
     private static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--building-bindings")
+        {
+            BuildingBindingValidation();
+            Console.WriteLine(passed + " checks passed.");
+            return 0;
+        }
         string root = Path.Combine(Path.GetTempPath(), "TABQoL.Tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -145,6 +202,7 @@ internal static class Program
             Check(Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = -1 }.Validate()) &&
                 Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = 1441 }.Validate()), "autosave interval bounds enforced");
             Check(Policy.GridKey(1) == 'Q' && Policy.GridKey(2) == 'W' && Policy.GridKey(5) == 'T' && Policy.GridKey(6) == 'A' && Policy.GridKey(15) == 'B' && Policy.GridKey(0) == 0, "command grid follows QWERT, ASDFG, ZXCVB");
+            BuildingBindingValidation();
             var schedule = new AutosaveSchedule();
             Check(!schedule.Tick(0, true, 1), "autosave does not fire immediately");
             for (int second = 1; second < 30; second++) schedule.Tick(second, true, 1);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace TABQoL
@@ -52,9 +53,12 @@ namespace TABQoL
 
         internal static void Validate()
         {
-            if (Entries.Any(e => e.Key != 0 && Bridge.Config.GlobalKeys().Contains(e.Key)))
+            // Auto keys follow the visible grid and yield to global shortcuts
+            // and explicit overrides. Only saved overrides reserve keys.
+            var custom = Entries.Where(e => Bridge.Config.BuildingKeys.Any(b => b.EntityType == e.Id)).ToArray();
+            if (custom.Any(e => e.Key != 0 && Bridge.Config.GlobalKeys().Contains(e.Key)))
                 throw new InvalidOperationException("This key is used by a building. Change its building binding first.");
-            if (Entries.GroupBy(e => e.Category).Any(g => g.Where(e => e.Key != 0).GroupBy(e => e.Key).Any(k => k.Count() > 1)))
+            if (custom.GroupBy(e => e.Category).Any(g => g.Where(e => e.Key != 0).GroupBy(e => e.Key).Any(k => k.Count() > 1)))
                 throw new InvalidOperationException("Choose different keys within each building category.");
         }
 
@@ -78,22 +82,7 @@ namespace TABQoL
         internal static void UpdateControl(object control)
         {
             if (Bridge.Config == null) return;
-            bool structure = SelectedStructure();
-            bool visible = (bool)Reflect.Get(control, "Visible");
-            if (structure && visible && IsCategory(Reflect.Get(control, "Tag")))
-            {
-                // Refresh every category together: native selection changes may
-                // repopulate controls in a different order from their grid positions.
-                // A later category must also update keys already drawn earlier.
-                var buttons = Buttons(control);
-                if (buttons != null)
-                {
-                    foreach (var button in buttons)
-                        if ((bool)Reflect.Get(button, "Visible") && IsCategory(Reflect.Get(button, "Tag"))) ApplyKey(button, KeyFor(button));
-                    return;
-                }
-            }
-            ApplyKey(control, structure && visible ? KeyFor(control) : 0);
+            ApplyKey(control, SelectedStructure() && (bool)Reflect.Get(control, "Visible") ? KeyFor(control) : 0);
         }
 
         private static void ApplyKey(object control, int key)
@@ -141,32 +130,33 @@ namespace TABQoL
             if (Convert.ToInt32(Reflect.Get(control, "FixedKey")) == 27) return 0;
             var command = Reflect.Get(control, "Tag");
             var entry = command != null && command.GetType().FullName == "ZX.Commands.Build" ? Entries.FirstOrDefault(e => ReferenceEquals(e.Command, command)) : null;
-            if (entry != null) return entry.Key;
+            if (entry != null && Bridge.Config.BuildingKeys.Any(b => b.EntityType == entry.Id)) return entry.Key;
             var buttons = Buttons(control);
             if (buttons == null) return 0;
-            if (IsCategory(command))
-            {
-                // Category enum values encode native panel positions and contain
-                // gaps. Compact the displayed categories into Q,W,E,R,T,... while
-                // keeping their native positions and the build/recruitment grids.
-                var categories = buttons.Cast<object>().Where(b => (bool)Reflect.Get(b, "Visible"))
-                    .Select(b => Reflect.Get(b, "Tag")).Where(IsCategory)
-                    .Distinct().OrderBy(c => Convert.ToInt32(c)).ToList();
-                int ordinal = categories.FindIndex(c => Equals(c, command));
-                int key = Policy.GridKey(ordinal + 1);
-                return Bridge.Config.GlobalKeys().Contains(key) ? 0 : key;
-            }
+            // Every native menu keeps the same physical keyboard rows, including
+            // category buttons separated by gaps: QWERT / ASDFG / ZXCVB.
             for (int row = 0; row < 3; row++)
                 for (int column = 0; column < 5; column++)
                     if (ReferenceEquals(buttons.GetValue(column, row), control))
                     {
                         int key = Policy.GridKey(row * 5 + column + 1);
-                        return Bridge.Config.GlobalKeys().Contains(key) ? 0 : key;
+                        return Bridge.Config.GlobalKeys().Contains(key) || CustomUsesKey(buttons, control, key) ? 0 : key;
                     }
             return 0;
         }
 
-        private static bool IsCategory(object tag) { return tag != null && tag.GetType().FullName == "ZX.ZXCommandCategory"; }
+        private static bool CustomUsesKey(Array buttons, object control, int key)
+        {
+            foreach (var button in buttons)
+            {
+                if (ReferenceEquals(button, control) || !(bool)Reflect.Get(button, "Visible")) continue;
+                var command = Reflect.Get(button, "Tag");
+                if (command == null || command.GetType().FullName != "ZX.Commands.Build") continue;
+                var entry = Entries.FirstOrDefault(e => ReferenceEquals(e.Command, command));
+                if (entry != null && entry.Key == key && Bridge.Config.BuildingKeys.Any(b => b.EntityType == entry.Id)) return true;
+            }
+            return false;
+        }
 
         private static Array Buttons(object control)
         {
@@ -185,10 +175,63 @@ namespace TABQoL
             foreach (var button in buttons)
             {
                 if (!(bool)Reflect.Get(button, "Visible") || KeyFor(button) != key) continue;
-                if ((bool)Reflect.Get(button, "Enabled")) Reflect.Call(system, "#=zEHnEwyMK7mIMOOClaw==", button);
+                // The grid's Enabled state can reflect the primary building.
+                // Group training checks every selected producer independently.
+                if (!TryQueueSelected(system, Reflect.Get(button, "Tag")) && (bool)Reflect.Get(button, "Enabled"))
+                    Reflect.Call(system, "#=zEHnEwyMK7mIMOOClaw==", button);
                 return true;
             }
             return false;
+        }
+
+        private static bool TryQueueSelected(object system, object command)
+        {
+            if (command == null || command.GetType().FullName != "ZX.Commands.Train") return false;
+            bool group = false;
+            try
+            {
+                var selectable = Reflect.Type("ZX.Components.CSelectable");
+                var selection = selectable.GetField(Compatibility.RuntimeSymbol("#=zV9GubOAdTaKJ"), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (selection == null) throw new MissingFieldException(selectable.FullName, "selected entities");
+                var structure = Reflect.Type("ZX.Entities.Structure");
+                // DXConcurrentHashSet exposes its own locked snapshot method;
+                // it does not implement System.Collections.IEnumerable.
+                var buildings = Reflect.Items(Reflect.Call(selection.GetValue(null), "ToList")).Select(s => Reflect.Get(s, "Entity"))
+                    .Where(e => e != null && structure.IsInstanceOfType(e) && Reflect.Get(e, "Team").ToString() == "Player").Distinct().ToList();
+                if (buildings.Count < 2) return false;
+                group = true;
+                var unit = (Type)Reflect.Get(command, "EntityType");
+                var target = Activator.CreateInstance(Reflect.Type("ZX.Commands.ZXCommandTarget"));
+                foreach (var building in buildings)
+                {
+                    var commandable = Reflect.Call(building, "#=zd4B080STejtVeVx5odMu2mI=");
+                    if (commandable == null) continue;
+                    var train = Reflect.Items(Reflect.Get(commandable, "AvailableCommands"))
+                        .FirstOrDefault(c => c.GetType().FullName == "ZX.Commands.Train" && Equals(Reflect.Get(c, "EntityType"), unit));
+                    // Recheck each building immediately before execution: the
+                    // previous purchase may have spent the remaining resources.
+                    // These native checks also enforce unlocks, queue limits,
+                    // construction/repair state and other unit requirements.
+                    if (train == null || !(bool)Reflect.Call(train, "#=zBxvmPXf0pX6L", building) ||
+                        !(bool)Reflect.Call(train, "#=ztKqx10CcsHta", building)) continue;
+                    Reflect.Call(train, "#=z9be3Bbo=", building, target);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Never replay the native group activation after a partial
+                // purchase. OnKey still consumes this key-down and its release.
+                Bridge.Log(ex);
+            }
+            finally
+            {
+                if (group)
+                {
+                    try { Reflect.Call(system, "#=ze3cy7Z0="); }
+                    catch (Exception ex) { Bridge.Log(ex); }
+                }
+            }
+            return true;
         }
     }
 }

@@ -7,6 +7,11 @@ namespace TABQoL
     {
         internal static readonly Dictionary<string, string> Names = new Dictionary<string, string>
         {
+            { "#=zV9GubOAdTaKJ", "#=zIiHCgn_odqH7" },
+            { "#=zd4B080STejtVeVx5odMu2mI=", "#=zkK_YqS85HrT3g75MJrlvMYo=" },
+            { "#=zBxvmPXf0pX6L", "#=zXAX1VeKTLe7O" },
+            { "#=ztKqx10CcsHta", "#=zKc8Kpc_EaFhf" },
+            { "#=z9be3Bbo=", "#=zfmgzkuw=" },
             { "#=zBmnjUnslgJaG", "#=zM3nhRXPdWdhx" },
             { "#=z_F7azNTGCKsjCnAtcA==", "#=zMtGuEM2lBSlZ5BGWvg==" },
             { "#=z_h2KT87115r3IrwOlA==", "#=z5Ns_eH8ENLF7HFU5mg==" },

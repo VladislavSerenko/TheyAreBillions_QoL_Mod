@@ -1,6 +1,6 @@
-# Installation modes
+# Installation modes — 0.3.1
 
-Use the same release ZIP and `Install.ps1 -GameDirectory <path>` for either
+Use `TABQoL-0.3.1.zip` and `Install.ps1 -GameDirectory <path>` for either
 supported edition. Close the game first. The installer accepts only the exact
 original executable hashes listed in the README.
 

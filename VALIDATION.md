@@ -1,11 +1,62 @@
-# Validation — 0.3.0
+# Validation — 0.3.1
+
+## 0.3.1 verification
+
+The finishing update changes window layout and navigation, autosave presets,
+icon-row shortcuts and commands for multiple selected production buildings.
+
+The clean 0.3.1 build passes **80 automated checks with both supported original
+executables supplied**, with **zero warnings and errors**. Of these checks,
+57 do not require game files. The private integration probe and its frame call
+have been removed from the source and are absent from the release binary.
+
+Five binding regression checks verify that explicit construction/global keys
+can reserve an Auto grid key, explicit construction keys still reject global
+conflicts and duplicates within a category, and separate categories can reuse
+an explicit key.
+
+The following native Steam checks are confirmed on 2026-10-18:
+
+| Feature | Confirmed behavior |
+| --- | --- |
+| Clean Steam release | Startup, physical F11, Settings and OK work with the release build; the original Steam EXE remains byte-for-byte unchanged |
+| Options layout | QoL controls align within the native Options window; secondary brass buttons use smaller cropped side tips, and the dropdown is compact |
+| Autosave presets | Off and 5, 10, 15, …, 60 minute choices are selectable |
+| Existing interval | A saved custom 1-minute interval remains visible and unchanged until a preset is selected |
+| Campaign layout | The compact campaign panel and checkbox group render centered |
+| Child navigation | Physical Settings → Building hotkeys → Next → OK returns to Settings; the next OK returns to the root QoL screen; hidden parents do not show through |
+| Slot navigation | Changing slot pages and then pressing OK returns directly to the root QoL screen |
+| Modal lifecycle | F12 closes the debug/confirmation window family; returning through two OK actions restores the previously running simulation |
+| Multiple production buildings | Physical Q queues one unit in each of two selected buildings, charging the native 120 gold each (240 total) |
+| Queue and resource limits | With the first queue prefilled to four by the test fixture, real Q skips it and adds one unit to the other queue, spending the remaining 120 gold; a repeated Q adds no duplicate |
+| Worker limit | Exhausting available workers stops further native recruitment |
+| Packed icon rows | Defense commands use Q/W/E on the first visible row and A/S/D on the second; native Escape retains Back/Cancel behavior |
+| Custom construction key | Tent uses explicit Y while Cottage and Stone House keep the visible-slot W and E keys |
+| Player data | After removing eight disposable test saves, all 46 baseline save/checksum files still match exactly; original Settings.xml also matches its pre-test SHA-256, including the legacy 1-minute interval |
+
+The queue-limit fixture inserts the initial four entries without charging
+resources. Subsequent shortcut actions run the native queue and resource checks.
+
+The completed 0.3.0 results below are retained as a baseline. They do not
+substitute for verification of the changed 0.3.1 behavior.
+
+The clean GOG 0.3.1 release also passes startup, physical F11, Settings and OK
+smoke checks. Its log confirms runtime initialization and completion of the
+native scene transition. Detailed native feature tests use Steam; GOG coverage
+for this update is limited to startup and UI smoke checks.
+
+Native tests exercise the specific icon layouts, custom override and production
+limits above. Other locked-command arrangements and custom-key collisions have
+not been exhaustively tested in the running game.
+
+## Completed 0.3.0 verification
 
 Tested on Windows on 2026-10-17 with the exact Steam and GOG x64 executables
 identified in the README. Results apply to those builds. Steam loads the mod
 through its startup config and Harmony while keeping the original EXE
 byte-for-byte unchanged. GOG uses the dnlib EXE patch.
 
-## Automated verification
+### Automated verification — 0.3.0
 
 **75 checks pass with both supported original executables supplied. 52 run
 without game files.** Coverage includes:
@@ -31,7 +82,7 @@ without game files.** Coverage includes:
 Reproduce with `Build.ps1`; supply both originals through `-OriginalExe` to run
 the complete suite. These tests do not require shipping game assemblies.
 
-## Native Steam integration
+### Native Steam integration — 0.3.0
 
 Tests use separately named disposable campaign copies with separate game IDs.
 The diagnostic command handler used for local checks is excluded from the
