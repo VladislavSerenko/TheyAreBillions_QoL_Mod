@@ -5,6 +5,18 @@ namespace TABQoL
     {
         public const string OriginalSha256 = "f502e38dd6840a5d52331c1c8d68ab94c79f620e2dd5453e9bf5168d909433d3";
         public const string GameVersion = "1.1.4.10 (GOG x64)";
+        public const string SteamSha256 = "695cef4ad913f9ffd1f9f0508d26862546b130922db53dce716051fe9b0a9d2d";
+        public const string SteamVersion = "Steam x64 (EXE 1.0.14.29)";
+        internal static bool RuntimeSteam;
+
+        public static bool Supported(string hash) { return hash == OriginalSha256 || hash == SteamSha256; }
+        public static string VersionFor(string hash) { return hash == SteamSha256 ? SteamVersion : GameVersion; }
+        public static string Symbol(string name, bool steam)
+        {
+            string mapped;
+            return steam && SteamSymbols.Names.TryGetValue(name, out mapped) ? mapped : name;
+        }
+        internal static string RuntimeSymbol(string name) { return Symbol(name, RuntimeSteam); }
         public const string Game = "#=zDWKQa9iNgGJZwrF26g==";
         public const string MissionSystem = "#=zSz0PIPoe$1bzpCj9VL55$uw=";
         public const string WorldSystem = "#=zrkMXvYMLBXvSpF4_wXnuWWSJBi98";

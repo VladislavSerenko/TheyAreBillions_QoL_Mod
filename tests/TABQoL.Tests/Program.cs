@@ -1,8 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
+using System.Xml;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
 using TABQoL;
 using TABQoL.Installer;
+using Installer = TABQoL.Installer.Program;
 
 internal static class Program
 {
@@ -19,8 +25,190 @@ internal static class Program
         catch (T) { return true; }
     }
 
+    private static void BuildingBindingValidation()
+    {
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+        var configField = typeof(Bridge).GetField("Config", flags);
+        var hotkeys = typeof(Bridge).Assembly.GetType("TABQoL.BuildingHotkeys", true);
+        var entriesField = hotkeys.GetField("entries", flags);
+        var entryType = hotkeys.GetNestedType("Entry", System.Reflection.BindingFlags.NonPublic);
+        var validate = hotkeys.GetMethod("Validate", flags);
+        object previousConfig = configField.GetValue(null), previousEntries = entriesField.GetValue(null);
+        try
+        {
+            var entries = (System.Collections.IList)Activator.CreateInstance(entriesField.FieldType);
+            void Entry(string id, string category, int key)
+            {
+                var entry = Activator.CreateInstance(entryType, true);
+                foreach (var value in new[] { new { Name = "Id", Value = (object)id }, new { Name = "Category", Value = (object)category }, new { Name = "Key", Value = (object)key } })
+                    entryType.GetField(value.Name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(entry, value.Value);
+                entries.Add(entry);
+            }
+            bool Valid(Settings config)
+            {
+                configField.SetValue(null, config);
+                try { validate.Invoke(null, null); return true; }
+                catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is InvalidOperationException) { return false; }
+            }
+            Entry("auto-housing", "Housing", 'Q');
+            Entry("custom-housing", "Housing", 'Q');
+            Entry("custom-resources", "Resources", 'Q');
+            entriesField.SetValue(null, entries);
+            var settings = new Settings();
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-housing", Key = 'Q' });
+            Check(Valid(settings), "explicit construction binding can take an Auto grid key");
+            settings = new Settings { MenuKey = 'Q' };
+            Check(Valid(settings), "global shortcut can reserve a cached Auto grid key");
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-housing", Key = 'Q' });
+            Check(!Valid(settings), "explicit construction binding still conflicts with a global shortcut");
+            settings = new Settings();
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "auto-housing", Key = 'Q' });
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-housing", Key = 'Q' });
+            Check(!Valid(settings), "explicit construction bindings cannot repeat within a category");
+            settings.BuildingKeys.RemoveAt(0);
+            settings.BuildingKeys.Add(new BuildingBinding { EntityType = "custom-resources", Key = 'Q' });
+            Check(Valid(settings), "explicit construction bindings can repeat across categories");
+        }
+        finally
+        {
+            configField.SetValue(null, previousConfig);
+            entriesField.SetValue(null, previousEntries);
+        }
+    }
+
+    private static void CommandActivationTarget(string executable, bool steam, bool patched)
+    {
+        using (var module = ModuleDefMD.Load(executable))
+        {
+            var mission = module.Types.Single(t => t.FullName == Compatibility.Symbol(Compatibility.MissionSystem, steam));
+            var activate = mission.Methods.Single(m => m.Name == Compatibility.Symbol("#=zEHnEwyMK7mIMOOClaw==", steam));
+            Check(!activate.IsStatic && activate.HasBody && activate.MethodSig.RetType.FullName == "System.Void" &&
+                activate.MethodSig.Params.Count == 1 && activate.MethodSig.Params[0].FullName == "ZX.GUI.ZXControlCommand",
+                (steam ? "Steam alias" : "GOG activation") + " resolves to the native instance command-button handler signature");
+            if (steam)
+            {
+                var cancel = mission.Methods.Single(m => m.Name == Compatibility.Symbol("#=zxEeLa$s1cFWH9gUCClxHkJs=", true));
+                Check(!cancel.IsStatic && cancel.HasBody && cancel.MethodSig.RetType.FullName == "System.Void" && cancel.MethodSig.Params.Count == 0,
+                    "Steam targeting-cancellation alias resolves to the native parameterless instance handler");
+            }
+            if (!patched) return;
+
+            activate.Body.SimplifyMacros(activate.Parameters);
+            var body = activate.Body.Instructions;
+            Check(body.Count > 5 && body[0].OpCode == OpCodes.Ldarg && ReferenceEquals(body[0].Operand, activate.Parameters[0]) &&
+                body[1].OpCode == OpCodes.Ldarg && ReferenceEquals(body[1].Operand, activate.Parameters[1]) &&
+                body[2].OpCode == OpCodes.Call && body[2].Operand is IMethod hook &&
+                hook.DeclaringType.FullName == typeof(Bridge).FullName && hook.Name == "CommandActivating" &&
+                hook.MethodSig.RetType.FullName == "System.Boolean" &&
+                body[3].OpCode == OpCodes.Brfalse && ReferenceEquals(body[3].Operand, body[5]) && body[4].OpCode == OpCodes.Ret,
+                "GOG command-button activation consumes a handled group and otherwise enters the original native body");
+        }
+    }
+
+    private static void SteamLifecycle(string root, string original)
+    {
+        string game = Path.Combine(root, "SteamLifecycle");
+        Directory.CreateDirectory(game);
+        string exe = Path.Combine(game, "TheyAreBillions.exe");
+        string config = exe + ".config";
+        string runtime = Path.Combine(game, "TABQoL.Runtime.dll"), harmony = Path.Combine(game, "0Harmony.dll");
+        string installation = Path.Combine(game, "TABQoL.Installation");
+        File.Copy(original, exe);
+        File.WriteAllText(config, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<configuration>\r\n" +
+            "  <!-- Кампания: keep original bytes -->\r\n  <runtime><gcServer enabled=\"true\" /></runtime>\r\n</configuration>\r\n", new UTF8Encoding(false));
+        string originalConfigHash = SnapshotStore.Hash(config);
+        int backups = 0, guards = 0;
+        Action backup = () => backups++;
+        Action guard = () => guards++;
+        Installer.Install(game, backup, guard);
+        var manifest = Installer.ReadManifest(game);
+        Check(manifest != null && manifest.Mode == "steam-startup-config" && backups == 1 && guards == 1 &&
+            manifest.OriginalConfigExists && manifest.OriginalConfigHash == originalConfigHash &&
+            SnapshotStore.Hash(exe) == Compatibility.SteamSha256 &&
+            SnapshotStore.Hash(Path.Combine(installation, "original", "TheyAreBillions.exe")) == Compatibility.SteamSha256 &&
+            SnapshotStore.Hash(Path.Combine(installation, "original", "TheyAreBillions.exe.config")) == originalConfigHash,
+            "Steam install keeps the exact EXE and records exact original EXE/config backups");
+        Check(SnapshotStore.Hash(runtime) == manifest.RuntimeHash && SnapshotStore.Hash(harmony) == manifest.HarmonyHash &&
+            SnapshotStore.Hash(config) == manifest.PatchedConfigHash && manifest.PatchedHash == Compatibility.SteamSha256,
+            "Steam manifest owns both copied DLLs and the startup config by checksum");
+        var configXml = new XmlDocument();
+        configXml.Load(config);
+        Check(configXml.SelectSingleNode("/configuration/runtime/gcServer/@enabled").Value == "true" &&
+            configXml.SelectSingleNode("/configuration/runtime/appDomainManagerType/@value").Value == "TABQoL.SteamDomainManager",
+            "Steam installed config keeps existing options and enables the runtime manager");
+        string inspectOutput;
+        var console = Console.Out;
+        using (var writer = new StringWriter())
+        {
+            try { Console.SetOut(writer); Installer.Inspect(game); }
+            finally { Console.SetOut(console); }
+            inspectOutput = writer.ToString();
+        }
+        Check(inspectOutput.Contains("TAB QoL is installed") && !inspectOutput.Contains("Compatible original EXE"),
+            "Steam inspect recognizes the manifest before the unchanged original EXE hash");
+        Installer.Install(game, backup, guard);
+        Check(backups == 1 && SnapshotStore.Hash(config) == manifest.PatchedConfigHash,
+            "repeated Steam install recognizes ownership without another backup or config edit");
+        var owned = new[] { exe, config, runtime, harmony,
+            Path.Combine(installation, "original", "TheyAreBillions.exe"),
+            Path.Combine(installation, "original", "TheyAreBillions.exe.config") };
+        foreach (string changed in owned)
+        {
+            byte[] unchanged = File.ReadAllBytes(changed);
+            File.AppendAllText(changed, "changed after install");
+            var before = owned.ToDictionary(path => path, SnapshotStore.Hash);
+            Check(Throws<IOException>(() => Installer.Uninstall(game, guard)) &&
+                before.All(file => SnapshotStore.Hash(file.Key) == file.Value) && Installer.ReadManifest(game) != null,
+                "Steam uninstall rejects changed " + Path.GetFileName(Path.GetDirectoryName(changed)) + "/" + Path.GetFileName(changed) + " before modifying files");
+            File.WriteAllBytes(changed, unchanged);
+        }
+        Installer.Uninstall(game, guard);
+        var archives = Directory.GetDirectories(game, "TABQoL.Installation.uninstalled-*");
+        Check(SnapshotStore.Hash(exe) == Compatibility.SteamSha256 && SnapshotStore.Hash(config) == originalConfigHash &&
+            !File.Exists(runtime) && !File.Exists(harmony) && !Directory.Exists(installation),
+            "Steam uninstall restores the exact config and removes only its owned DLLs");
+        Check(archives.Length == 1 && Path.GetDirectoryName(archives[0]) == game &&
+            SnapshotStore.Hash(Path.Combine(archives[0], "original", "TheyAreBillions.exe.config")) == originalConfigHash,
+            "Steam uninstall archives the exact backups inside the test game directory");
+        File.Delete(config);
+        Installer.Install(game, backup, guard);
+        manifest = Installer.ReadManifest(game);
+        Check(!manifest.OriginalConfigExists && string.IsNullOrEmpty(manifest.OriginalConfigHash) && File.Exists(config),
+            "Steam install records a previously absent startup config");
+        Installer.Uninstall(game, guard);
+        Check(!File.Exists(config) && !File.Exists(runtime) && !File.Exists(harmony) && SnapshotStore.Hash(exe) == Compatibility.SteamSha256,
+            "Steam uninstall removes a newly created config and preserves the original EXE");
+        File.WriteAllText(config, "<configuration><runtime><appDomainManagerType value=\"Another.Mod\" /></runtime></configuration>");
+        string foreignConfigHash = SnapshotStore.Hash(config);
+        Check(Throws<InvalidDataException>(() => Installer.Install(game, backup, guard)) &&
+            SnapshotStore.Hash(config) == foreignConfigHash && !Directory.Exists(installation) && !File.Exists(runtime) && !File.Exists(harmony),
+            "Steam install refuses another manager without creating installation files");
+        File.Delete(config);
+        foreach (string unowned in new[] { runtime, harmony })
+        {
+            File.WriteAllText(unowned, "another mod owns this DLL");
+            string unownedHash = SnapshotStore.Hash(unowned);
+            Check(Throws<IOException>(() => Installer.Install(game, backup, guard)) &&
+                SnapshotStore.Hash(unowned) == unownedHash && !Directory.Exists(installation) && !File.Exists(config),
+                "Steam install preserves unowned " + Path.GetFileName(unowned));
+            File.Delete(unowned);
+        }
+    }
+
     private static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--building-bindings")
+        {
+            BuildingBindingValidation();
+            Console.WriteLine(passed + " checks passed.");
+            return 0;
+        }
+        if (args.Length == 1 && args[0] == "--group-training")
+        {
+            TrainingActivationTests.Run(Check);
+            Console.WriteLine(passed + " checks passed.");
+            return 0;
+        }
         string root = Path.Combine(Path.GetTempPath(), "TABQoL.Tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -45,7 +233,26 @@ internal static class Program
             Check(!Settings.BindableKey(16) && !Settings.BindableKey(162) && !Settings.BindableKey(91) && Settings.BindableKey(117), "modifier/Windows keys rejected and ordinary function keys accepted");
             File.WriteAllText(settingsPath, "<Settings><Speed>2</Speed><MenuKey>121</MenuKey></Settings>");
             settings = Settings.Read(settingsPath);
-            Check(settings.CheatsKey == 123 && settings.BuildingKeys.Count == 0 && settings.Speed == 2, "0.1 settings migrate with F12 and default building keys");
+            Check(settings.CheatsKey == 123 && settings.MenuKey == 122 && settings.AutosaveMinutes == 10 && settings.BuildingKeys.Count == 0 && settings.Speed == 2, "old defaults migrate to F11 and ten-minute autosaves");
+            File.WriteAllText(settingsPath, "<Settings><MenuKey>117</MenuKey><Speed>1</Speed></Settings>");
+            Check(Settings.Read(settingsPath).MenuKey == 117, "custom menu binding survives migration");
+            Check(Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = -1 }.Validate()) &&
+                Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = 1441 }.Validate()), "autosave interval bounds enforced");
+            Check(Policy.GridKey(1) == 'Q' && Policy.GridKey(2) == 'W' && Policy.GridKey(5) == 'T' && Policy.GridKey(6) == 'A' && Policy.GridKey(15) == 'B' && Policy.GridKey(0) == 0, "command grid follows QWERT, ASDFG, ZXCVB");
+            BuildingBindingValidation();
+            TrainingActivationTests.Run(Check);
+            var schedule = new AutosaveSchedule();
+            Check(!schedule.Tick(0, true, 1), "autosave does not fire immediately");
+            for (int second = 1; second < 30; second++) schedule.Tick(second, true, 1);
+            for (int second = 30; second < 90; second++) schedule.Tick(second, false, 1);
+            Check(!schedule.Tick(90, true, 1), "paused or modal time excluded from autosave timer");
+            bool due = false;
+            for (int second = 91; second <= 120; second++) due = schedule.Tick(second, true, 1);
+            Check(due, "autosave becomes due after sixty seconds of active play");
+            schedule.Completed();
+            Check(!schedule.Tick(500, true, 1), "no catch-up save after a suspended process");
+            schedule.Reset();
+            Check(!schedule.Tick(501, true, 1) && !schedule.Tick(502, true, 0), "mission reset and disabled autosave cancel pending saves");
             settings.BuildingKeys.Add(new BuildingBinding { EntityType = "ZX.Entities.TentHouse", Key = 84 });
             settings.Write(settingsPath);
             Check(Settings.Read(settingsPath).BuildingKeys[0].Key == 84, "building overrides round trip");
@@ -78,13 +285,88 @@ internal static class Program
             Check(Throws<InvalidDataException>(() => store.StageLoad("campaign1-mission1", "quick", nativeSaves)), "corrupt snapshot rejected before load");
             Check(Throws<InvalidDataException>(() => store.Read("..", "quick")), "snapshot path traversal rejected");
             Check(Throws<IOException>(() => store.Save("campaign2", "quick", nativeSaves, p => File.WriteAllText(p, "no-checksum"))), "incomplete native save pair rejected");
-            if (args.Length == 1)
+            for (int i = 1; i <= 5; i++)
             {
-                string prepared = Path.Combine(root, "prepared.exe");
-                Patcher.Prepare(args[0], prepared);
+                string slot = store.NextAutosaveSlot("history");
+                Check(slot == "autosave" + i, "autosave fills separate history slot " + i);
+                store.Save("history", slot, nativeSaves, p => Write(p, "history " + i));
+            }
+            string oldest = store.NextAutosaveSlot("history");
+            Check(oldest == "autosave1", "full autosave ring replaces oldest slot");
+            store.Save("history", oldest, nativeSaves, p => Write(p, "sixth"));
+            Check(store.NextAutosaveSlot("history") == "autosave2" && store.Read("history", "quick") == null && store.Read("history", "slot1") == null, "autosave rotates without touching quick or manual slots");
+            string configPath = Path.Combine(root, "TheyAreBillions.exe.config");
+            const string unicodeConfigText = "Кампания — испытание 猫";
+            var utf8 = new UTF8Encoding(false, true);
+            File.WriteAllText(configPath, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<configuration>\n  <!-- keep existing options -->\n" +
+                "  <startup useLegacyV2RuntimeActivationPolicy=\"true\"><supportedRuntime version=\"v4.0\" sku=\".NETFramework,Version=v4.6.2\" /></startup>\n" +
+                "  <appSettings><add key=\"Campaign\" value=\"" + unicodeConfigText + "\" /></appSettings>\n" +
+                "  <runtime><gcServer enabled=\"true\" /><assemblyBinding xmlns=\"urn:schemas-microsoft-com:asm.v1\">" +
+                "<dependentAssembly><assemblyIdentity name=\"Example.Dependency\" publicKeyToken=\"0123456789abcdef\" culture=\"neutral\" />" +
+                "<bindingRedirect oldVersion=\"0.0.0.0-2.0.0.0\" newVersion=\"2.0.0.0\" /></dependentAssembly></assemblyBinding></runtime>\n</configuration>", utf8);
+            string originalConfigHash = SnapshotStore.Hash(configPath);
+            byte[] preparedConfig = StartupConfig.Prepare(configPath);
+            XmlDocument ReadConfig(byte[] bytes)
+            {
+                var document = new XmlDocument { XmlResolver = null };
+                using (var stream = new MemoryStream(bytes)) document.Load(stream);
+                return document;
+            }
+            var config = ReadConfig(preparedConfig);
+            var configNamespaces = new XmlNamespaceManager(config.NameTable);
+            configNamespaces.AddNamespace("asm", "urn:schemas-microsoft-com:asm.v1");
+            Check(config.SelectNodes("/configuration/runtime").Count == 1 &&
+                config.SelectSingleNode("/configuration/startup/@useLegacyV2RuntimeActivationPolicy").Value == "true" &&
+                config.SelectSingleNode("/configuration/startup/supportedRuntime/@sku").Value == ".NETFramework,Version=v4.6.2" &&
+                config.SelectSingleNode("/configuration/runtime/gcServer/@enabled").Value == "true" &&
+                config.SelectSingleNode("/configuration/runtime/asm:assemblyBinding/asm:dependentAssembly/asm:bindingRedirect/@newVersion", configNamespaces).Value == "2.0.0.0",
+                "Steam startup config preserves CLR options and namespaced assembly redirects");
+            Check(utf8.GetString(preparedConfig).Contains(unicodeConfigText) &&
+                config.SelectSingleNode("/configuration/appSettings/add[@key='Campaign']/@value").Value == unicodeConfigText &&
+                SnapshotStore.Hash(configPath) == originalConfigHash,
+                "Steam config preserves UTF-8 text without modifying the original file");
+            Check(config.SelectNodes("/configuration/runtime/appDomainManagerAssembly").Count == 1 &&
+                config.SelectNodes("/configuration/runtime/appDomainManagerType").Count == 1 &&
+                config.SelectSingleNode("/configuration/runtime/appDomainManagerAssembly/@value").Value == typeof(Bridge).Assembly.FullName &&
+                config.SelectSingleNode("/configuration/runtime/appDomainManagerType/@value").Value == "TABQoL.SteamDomainManager",
+                "Steam config selects the exact runtime manager assembly and type");
+            var createdConfig = ReadConfig(StartupConfig.Prepare(null));
+            Check(createdConfig.DocumentElement.Name == "configuration" &&
+                createdConfig.SelectSingleNode("/configuration/runtime/appDomainManagerAssembly/@value").Value == typeof(Bridge).Assembly.FullName &&
+                createdConfig.SelectSingleNode("/configuration/runtime/appDomainManagerType/@value").Value == "TABQoL.SteamDomainManager",
+                "Steam startup config is created when the game has no config file");
+            foreach (string managerNode in new[] { "appDomainManagerAssembly", "appDomainManagerType" })
+            {
+                File.WriteAllText(configPath, "<configuration><runtime><" + managerNode + " value=\"Another.Mod\" /></runtime></configuration>", utf8);
+                Check(Throws<InvalidDataException>(() => StartupConfig.Prepare(configPath)), "existing " + managerNode + " prevents startup config takeover");
+            }
+            File.WriteAllText(configPath, "<configuration><runtime configSource=\"external.config\" /></configuration>", utf8);
+            Check(Throws<InvalidDataException>(() => StartupConfig.Prepare(configPath)), "external runtime config is rejected without following it");
+            File.WriteAllText(configPath, "<configuration><runtime></configuration>", utf8);
+            Check(Throws<XmlException>(() => StartupConfig.Prepare(configPath)), "malformed startup XML is rejected");
+            File.WriteAllText(configPath, "<configuration><runtime /><runtime /></configuration>", utf8);
+            Check(Throws<InvalidDataException>(() => StartupConfig.Prepare(configPath)), "duplicate runtime sections are rejected");
+            Check(Compatibility.Supported(Compatibility.OriginalSha256) && Compatibility.Supported(Compatibility.SteamSha256) && !Compatibility.Supported("unknown"), "only exact GOG and Steam originals supported");
+            foreach (string original in args)
+            {
+                string originalHash = SnapshotStore.Hash(original);
+                string prepared = Path.Combine(root, originalHash + "-prepared.exe");
+                if (originalHash == Compatibility.SteamSha256)
+                {
+                    CommandActivationTarget(original, true, false);
+                    Check(Throws<InvalidDataException>(() => Patcher.Prepare(original, prepared)) && !File.Exists(prepared) &&
+                        SnapshotStore.Hash(original) == originalHash, "Steam EXE rewriting is rejected before creating output");
+                    SteamLifecycle(root, original);
+                    continue;
+                }
+                Patcher.Prepare(original, prepared);
                 Patcher.Verify(prepared);
-                Check(File.Exists(prepared), "actual supported EXE patched and all eight hook names verified");
-                Check(SnapshotStore.Hash(args[0]) == Compatibility.OriginalSha256, "original EXE unchanged");
+                CommandActivationTarget(prepared, false, true);
+                Patcher.VerifyMetadata(original, prepared);
+                Check(true, "original metadata token identities preserved");
+                Check(File.Exists(prepared), "actual " + Compatibility.VersionFor(originalHash) + " patched and all ten hook names verified");
+                Check(SnapshotStore.Hash(original) == originalHash, "original EXE unchanged");
                 Check(Throws<InvalidDataException>(() => Patcher.Prepare(prepared, Path.Combine(root, "double.exe"))), "double patch rejected");
             }
             Console.WriteLine(passed + " checks passed.");

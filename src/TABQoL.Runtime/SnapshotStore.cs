@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Xml.Serialization;
 
@@ -36,6 +37,13 @@ namespace TABQoL
         }
 
         private string DirectoryFor(string scope, string slot) { return Path.Combine(root, Safe(scope), Safe(slot)); }
+
+        public string NextAutosaveSlot(string scope)
+        {
+            return Enumerable.Range(1, 5).Select(i => new { Slot = "autosave" + i, Snapshot = Read(scope, "autosave" + i) })
+                .OrderBy(s => s.Snapshot == null ? DateTime.MinValue : s.Snapshot.CreatedUtc).ThenBy(s => s.Slot)
+                .First().Slot;
+        }
 
         public Snapshot Read(string scope, string slot)
         {

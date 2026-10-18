@@ -27,6 +27,9 @@ namespace TABQoL
         private static string stagedLoad;
         private static int loadFrames;
         private static readonly HashSet<int> heldKeys = new HashSet<int>();
+        private static readonly HashSet<int> contextualKeys = new HashSet<int>();
+        private static readonly AutosaveSchedule autosave = new AutosaveSchedule();
+        private static readonly global::System.Diagnostics.Stopwatch playClock = global::System.Diagnostics.Stopwatch.StartNew();
         [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
         [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
@@ -37,7 +40,12 @@ namespace TABQoL
             Ui.CheckKeyCapture();
             uint process;
             GetWindowThreadProcessId(GetForegroundWindow(), out process);
-            if (process != (uint)global::System.Diagnostics.Process.GetCurrentProcess().Id) { heldKeys.Clear(); return; }
+            if (process != (uint)global::System.Diagnostics.Process.GetCurrentProcess().Id)
+            {
+                heldKeys.Clear();
+                contextualKeys.Clear();
+                return;
+            }
             var keys = Ui.CaptureKey != null ? Enumerable.Range(8, 247) : Config.GlobalKeys().AsEnumerable();
             foreach (int key in keys)
             {
@@ -50,8 +58,8 @@ namespace TABQoL
         internal static object Campaign { get { return State == null ? null : Reflect.Get(State, "CampaignState"); } }
         internal static object Level { get { return State == null ? null : Reflect.Get(State, "LevelState"); } }
         internal static object System { get { return Reflect.Get(Game, "CurrentGameSystem"); } }
-        internal static bool InMission { get { return System != null && System.GetType().FullName == Compatibility.MissionSystem && Level != null; } }
-        internal static bool OnWorld { get { return System != null && System.GetType().FullName == Compatibility.WorldSystem && Campaign != null && Level == null; } }
+        internal static bool InMission { get { return System != null && System.GetType().FullName == Compatibility.RuntimeSymbol(Compatibility.MissionSystem) && Level != null; } }
+        internal static bool OnWorld { get { return System != null && System.GetType().FullName == Compatibility.RuntimeSymbol(Compatibility.WorldSystem) && Campaign != null && Level == null; } }
         internal static string Saves { get { return (string)Reflect.Call(Reflect.Type(Compatibility.Game), Compatibility.SavesDirectory); } }
         internal static bool Loading { get { return (bool)Reflect.Get(Game, "IsLoading"); } }
         internal static bool Ready { get { return !Loading && (bool)Reflect.Get(Game, "InputEnabled"); } }
@@ -61,6 +69,7 @@ namespace TABQoL
             if (initialized || failed) return;
             Game = game;
             Reflect.GameAssembly = game.GetType().Assembly;
+            Compatibility.RuntimeSteam = game.GetType().FullName == Compatibility.Symbol(Compatibility.Game, true);
             DataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "They Are Billions", "TABQoL");
             Directory.CreateDirectory(DataDirectory);
             string path = Path.Combine(DataDirectory, "Settings.xml");
@@ -73,7 +82,7 @@ namespace TABQoL
             }
             Store = new SnapshotStore(Path.Combine(DataDirectory, "Snapshots"));
             initialized = true;
-            Log("TAB QoL initialized; " + Compatibility.GameVersion);
+            Log("TAB QoL initialized; " + (Compatibility.RuntimeSteam ? Compatibility.SteamVersion : Compatibility.GameVersion));
         }
 
         public static void OnFrame(object game)
@@ -100,6 +109,7 @@ namespace TABQoL
                     if (!ReferenceEquals(previousLevel, Level))
                     {
                         Cheats.Reset();
+                        autosave.Reset();
                         if (loadSourceLevel != null && !ReferenceEquals(loadSourceLevel, Level))
                         {
                             Reflect.Set(Game, "Paused", loadPaused);
@@ -112,6 +122,14 @@ namespace TABQoL
                     if ((double)Reflect.Get(Game, "GameSpeed") != Config.Speed) ApplySpeed(Config.Speed);
                 }
                 else if (!InMission) Cheats.Reset();
+                bool eligible = InMission && Ready && !busy && pending == null &&
+                    !(bool)Reflect.Get(Game, "Paused") && Reflect.Get(Level, "EndStatus").ToString() == "Playing" &&
+                    !(bool)Reflect.Get(Reflect.Type("DXVision.GUI.DXModalScreen"), "IsInModal");
+                if (autosave.Tick(playClock.Elapsed.TotalSeconds, eligible, Config.AutosaveMinutes))
+                {
+                    try { Save(Store.NextAutosaveSlot(Scope())); autosave.Completed(); }
+                    catch (Exception ex) { autosave.Failed(); Log(ex); Notify("Autosave failed. See TABQoL.log."); }
+                }
             }
             catch (Exception ex)
             {
@@ -126,7 +144,7 @@ namespace TABQoL
             {
                 Initialize(game);
                 if (!initialized) return false;
-                if (Ui.CaptureKey != null) { Ui.CaptureKey(key); heldKeys.Clear(); return true; }
+                if (Ui.CaptureKey != null) { lastKey = DateTime.UtcNow; Ui.CaptureKey(key); heldKeys.Clear(); return true; }
                 bool recognized = Config.GlobalKeys().Contains(key);
                 if (!recognized || !Ready) return false;
                 if ((DateTime.UtcNow - lastKey).TotalMilliseconds < 250) return true;
@@ -169,6 +187,7 @@ namespace TABQoL
         {
             string mission = Campaign == null ? "survival" : (string)Reflect.Get(Campaign, "IDCurrentMission");
             string identity = Convert.ToString(Reflect.Get(State, "ID"), CultureInfo.InvariantCulture) + ":" + mission;
+            if (Compatibility.RuntimeSteam) identity = "steam:" + identity;
             using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(identity))).Replace("-", "").ToLowerInvariant();
         }
 
@@ -242,10 +261,38 @@ namespace TABQoL
             catch (Exception ex) { Log(ex); }
         }
 
+        public static bool CommandActivating(object system, object control)
+        {
+            try
+            {
+                if (!initialized || !InMission || !Ready) return false;
+                return BuildingHotkeys.OnActivate(system, control);
+            }
+            catch (Exception ex) { Log(ex); return false; }
+        }
+
         public static bool BuildingKeyDown(object system, int key)
         {
-            try { return initialized && BuildingHotkeys.OnKey(system, key); }
+            try
+            {
+                if (!initialized) return false;
+                if (Ui.CaptureKey != null || Config.GlobalKeys().Contains(key)) return true;
+                if (!BuildingHotkeys.OnKey(system, key)) return false;
+                contextualKeys.Add(key);
+                return true;
+            }
             catch (Exception ex) { Log(ex); return false; }
+        }
+
+        public static bool GlobalKeyUp(object game, int key)
+        {
+            if (!initialized) return false;
+            // A contextual command can change the selection on key-down. Keep
+            // its matching release away from native global key-up actions.
+            bool contextual = contextualKeys.Remove(key);
+            if (Ui.CaptureKey == null && !Config.GlobalKeys().Contains(key)) return contextual;
+            OnKey(Game, key);
+            return true;
         }
 
         public static bool IgnoreDamage(object life)

@@ -2,6 +2,6 @@
   <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>TABQoL.Installer</AssemblyName></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../TABQoL.Runtime/TABQoL.Runtime.csproj" />
-    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+    <PackageReference Include="dnlib" Version="4.5.0" />
   </ItemGroup>
 </Project>

@@ -15,6 +15,7 @@ namespace TABQoL
         }
 
         public static bool ValidSpeed(double speed) { return Speeds.Contains(speed); }
+        public static int GridKey(int position) { return position >= 1 && position <= 15 ? "QWERTASDFGZXCVB"[position - 1] : 0; }
 
         public static int Refund(IEnumerable<string> ids, IDictionary<string, int> costs)
         {
