@@ -9,7 +9,7 @@ into your own local copy of the game.
 
 ## Supported versions
 
-Version 0.3.1 supports **Steam and GOG x64** for the exact builds below.
+Version 0.3.2 supports **Steam and GOG x64** for the exact builds below.
 See [tested behavior and limits](VALIDATION.md). The installer detects the
 edition from the original `TheyAreBillions.exe` SHA-256:
 
@@ -27,7 +27,7 @@ normally with its own dependencies installed.
 
 ## Install
 
-1. Close the game. Extract `TABQoL-0.3.1.zip` into a separate folder.
+1. Close the game. Extract `TABQoL-0.3.2.zip` into a separate folder.
 2. Open PowerShell in the extracted folder and run:
 
    ```powershell
@@ -77,6 +77,8 @@ before native special actions, including the game's F11 developer action.
 QoL windows use compact centered layouts with aligned controls and smaller
 brass action buttons. **OK** returns to the previous QoL screen. Changing
 Save/Load pages stays within that screen.
+In native Options, the four QoL actions align with the Cancel/Apply columns
+when the tab becomes visible and after switching tabs.
 
 ### Mission saves
 
@@ -118,8 +120,10 @@ Visible hints follow the current command grid. Native unlock, resource, queue
 and placement requirements still apply. Escape retains native Back/Cancel
 behavior. Unit selections keep their native keys.
 
-With multiple production buildings selected, a recruitment shortcut queues
-one unit in each eligible building. Each building uses the native resource,
+With multiple production buildings selected, clicking a unit icon or pressing
+its grid key queues one unit in each eligible building. Mouse and keyboard
+use the same activation path, so each action queues once per building.
+Each building uses the native resource,
 unlock and queue checks, so available resources can limit how many accept it.
 
 Open **F11 > Building hotkeys** or **Options > TAB QoL > Building hotkeys** to
@@ -227,8 +231,8 @@ On Windows with the .NET SDK 8 or newer:
 
 The release ZIP is written to `artifacts`. NuGet restores dnlib 4.5.0,
 Lib.Harmony 2.4.1 and .NET Framework reference assemblies. No game assemblies
-are required to compile. The clean **0.3.1** build passes **80 checks with both
-supported originals supplied**; 57 checks do not require game files.
+are required to compile. The clean **0.3.2** build passes **112 checks with both
+supported originals supplied**; **85 checks** do not require game files.
 Native verification is tracked in [VALIDATION.md](VALIDATION.md). The checks cover settings,
 autosave timing, command-grid mapping, slot isolation/retention, checksum
 rejection, interrupted writes and startup config preservation. With

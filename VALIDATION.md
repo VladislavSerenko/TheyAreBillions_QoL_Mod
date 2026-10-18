@@ -1,6 +1,57 @@
-# Validation — 0.3.1
+# Validation — 0.3.2
+
+## 0.3.2 verification
+
+This update routes mouse clicks and native command-grid keys through the same
+recruitment activation hook, so a group action queues once per eligible
+production building. It also aligns the four Options actions to the native
+Cancel/Apply columns when the QoL tab is actually visible, including after tab
+switches and layout changes. A hidden tab no longer loses a one-shot alignment
+callback.
+
+The clean build passes **112 checks with both supported original executables
+supplied**, with **zero warnings and errors**. **85 checks** run without game
+files. The additions include 28 isolated API checks for group activation
+(14 per edition, using its actual symbol names) and four checks against the
+original EXEs for activation hooks and signatures.
+
+Confirmed native checks:
+
+| Feature | Confirmed behavior |
+| --- | --- |
+| Steam grid key | Physical Q starts one Ranger in each of two idle production buildings; gold changes from 26,300 to 26,060 |
+| Steam icon after key | Clicking the unit icon adds one Ranger to each queue and spends another 240 gold, leaving 25,820 |
+| Steam icon from idle | Reloading the baseline and clicking the icon alone starts both idle queues for 240 gold |
+| Steam insufficient gold | Clicking with zero gold adds no units to either queue |
+| GOG grid key | Physical Q starts one Ranger in each of two idle production buildings; gold changes from 26,300 to 26,060 |
+| GOG icon after key | Clicking the unit icon adds one Ranger to each queue and spends another 240 gold, leaving 25,820 |
+| GOG icon from idle | Reloading the baseline and clicking the icon alone starts both idle queues for 240 gold |
+| GOG insufficient gold | Pressing Q with zero gold adds no units to either queue |
+| Options alignment | Native Steam and GOG captures show the four QoL actions in the Cancel/Apply columns |
+| Tab switching | Switching Game → TAB QoL in Steam retains the footer-column alignment |
+| Clean releases | Steam and GOG both pass physical startup/F11/Settings/OK smoke checks; native captures were reviewed |
+
+Both final installations pass installer inspection and contain a runtime DLL
+matching the clean release. The private integration probe and its frame call
+are absent from the source and clean release DLL. The original Steam EXE
+remains byte-for-byte unchanged.
+
+Ten task-owned disposable save/checksum files were removed. All 56 original
+files in the save directory match the pre-test baseline exactly: 55 player
+files and `steam_autocloud.vdf`. The original `Settings.xml` SHA-256 also
+matches, preserving the existing preferences and custom interval.
+
+Native checks cover the specific selections and layouts described above;
+other locked-command layouts and compatibility with other mods have not been
+exhaustively tested.
+
+The completed 0.3.1 and earlier results below are historical coverage.
 
 ## 0.3.1 verification
+
+Later player reports exposed gaps in the native activation and initially hidden
+Options-tab coverage. Version 0.3.2 addresses those paths; the results below
+record the earlier test scope.
 
 The finishing update changes window layout and navigation, autosave presets,
 icon-row shortcuts and commands for multiple selected production buildings.

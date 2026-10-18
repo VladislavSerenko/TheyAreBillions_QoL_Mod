@@ -7,7 +7,7 @@
     <PathMap>$(MSBuildThisFileDirectory)=/_/tab-qol/</PathMap>
     <DebugType>portable</DebugType>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
     <Authors>TAB QoL contributors</Authors>
   </PropertyGroup>
   <ItemGroup>

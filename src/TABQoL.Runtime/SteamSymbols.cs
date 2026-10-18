@@ -36,6 +36,7 @@ namespace TABQoL
             { "#=zEb$WviU=", "#=zRIE20Dk=" },
             { "#=zecoAwxI00vS7vQao43Sgb4AXv8bq2eHvtg==", "#=zifok0BN8G1$f0Bbx0zViJCxVzYSoy47egw==" },
             { "#=zEHnEwyMK7mIMOOClaw==", "#=zefLbEQj3ugNnpskJ_w==" },
+            { "#=zxEeLa$s1cFWH9gUCClxHkJs=", "#=z$xo$17_AskhgfUuy9Epz5JQ=" },
             { "#=zELX0oyIBb7sj", "#=zphg$7T0x0GWi" },
             { "#=zG9K55tU=", "#=zXdArBkQ=" },
             { "#=zgTbz09XqLxYj+#=zz8951q8=", "#=z4ztojdHuH9At+#=zrtNti8Q=" },

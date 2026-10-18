@@ -19,6 +19,13 @@ namespace TABQoL
         private static bool reporting;
         private static object cheatsWindow;
         private static object slotsWindow, buildingWindow;
+        private static OptionsLayout optionsLayout;
+        private sealed class OptionsLayout
+        {
+            internal object Window, Panel, Content;
+            internal object[] Actions, Footers;
+            internal bool Attached;
+        }
         internal static bool CheatsOpen { get { return cheatsWindow != null && Reflect.Get(cheatsWindow, "Scene") != null; } }
         private static float Unit { get { return Convert.ToSingle(Reflect.Get(Reflect.Type("DXVision.DXScene"), "Unit"), CultureInfo.InvariantCulture); } }
 
@@ -119,6 +126,7 @@ namespace TABQoL
 
         internal static void CheckKeyCapture()
         {
+            UpdateOptionsLayout();
             foreach (var window in windows.Where(w => Reflect.Get(w, "Scene") == null).Reverse().ToArray()) Forget(window);
             if (CaptureKey != null && captureButton != null && Reflect.Get(captureButton, "Scene") == null)
             {
@@ -197,28 +205,50 @@ namespace TABQoL
             var page = Reflect.Call(window, Compatibility.AddTab, "TAB QoL");
             var panel = Reflect.Get(page, "Panel");
             var content = Reflect.Get(panel, "Content");
-            // Align secondary actions to the native Center/Right footer buttons
-            // (Cancel/Apply), using their actual positions in this window layout.
-            var footerType = Reflect.Type("ZX.GUI.ZXWindow");
-            var footers = footerType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
-                .Where(f => f.FieldType.FullName == "ZX.GUI.ZXButtonSteam").Select(f => f.GetValue(window))
-                .OrderBy(b => OffsetX(b, window)).ToArray();
-            var actions = PopulateSettings(content, Convert.ToSingle(Reflect.Get(panel, "ContentWidth"), CultureInfo.InvariantCulture));
-            Reflect.Call(panel, "Update");
-            // TabControl normalizes the panel's position when it joins the
-            // scene. Align against that final geometry on the next frame.
-            Reflect.Call(Bridge.Game, "InvokeOnStartFrame", (Action)(() => Bridge.Run(() =>
+            optionsLayout = new OptionsLayout
             {
-                if (Reflect.Get(content, "Scene") == null || footers.Length != 3) return;
-                float origin = OffsetX(content, window);
-                for (int i = 0; i < actions.Length; i++)
-                {
-                    var footer = footers[1 + i % 2];
-                    float center = OffsetX(footer, window) + (float)Reflect.Get(footer, "Width") / 2 - origin;
-                    Reflect.Set(actions[i], "X", center - (float)Reflect.Get(actions[i], "Width") / 2);
-                }
-                Reflect.Call(panel, "Update");
-            })));
+                Window = window,
+                Panel = panel,
+                Content = content,
+                Actions = PopulateSettings(content, Convert.ToSingle(Reflect.Get(panel, "ContentWidth"), CultureInfo.InvariantCulture)),
+                Footers = Reflect.Type("ZX.GUI.ZXWindow").GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+                .Where(f => f.FieldType.FullName == "ZX.GUI.ZXButtonSteam").Select(f => f.GetValue(window))
+                .Where(b => b != null).ToArray()
+            };
+            Reflect.Call(panel, "Update");
+        }
+
+        private static void UpdateOptionsLayout()
+        {
+            var layout = optionsLayout;
+            if (layout == null) return;
+            if (Reflect.Get(layout.Window, "Scene") == null)
+            {
+                if (layout.Attached) optionsLayout = null;
+                return;
+            }
+            layout.Attached = true;
+            // A newly created tab is hidden until selected. Keep checking its
+            // final scene geometry, including later tab switches and resizing.
+            if (!(bool)Reflect.Get(layout.Window, "Visible") || !(bool)Reflect.Get(layout.Panel, "Visible") ||
+                Reflect.Get(layout.Content, "Scene") == null) return;
+            var footers = layout.Footers.Where(b => (bool)Reflect.Get(b, "Visible"))
+                .OrderBy(b => OffsetX(b, layout.Window)).ToArray();
+            if (footers.Length < 2) return;
+            float origin = OffsetX(layout.Content, layout.Window);
+            bool changed = false;
+            for (int i = 0; i < layout.Actions.Length; i++)
+            {
+                // The two rightmost visible native footer buttons are Cancel
+                // and Apply; an optional left footer does not affect alignment.
+                var footer = footers[footers.Length - 2 + i % 2];
+                float center = OffsetX(footer, layout.Window) + (float)Reflect.Get(footer, "Width") / 2 - origin;
+                float x = center - (float)Reflect.Get(layout.Actions[i], "Width") / 2;
+                if (Math.Abs((float)Reflect.Get(layout.Actions[i], "X") - x) < 0.1f) continue;
+                Reflect.Set(layout.Actions[i], "X", x);
+                changed = true;
+            }
+            if (changed) Reflect.Call(layout.Panel, "Update");
         }
 
         private static float OffsetX(object control, object ancestor)

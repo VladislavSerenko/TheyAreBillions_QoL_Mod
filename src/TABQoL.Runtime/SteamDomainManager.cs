@@ -163,7 +163,8 @@ namespace TABQoL
                     Method(mission, "OnKeyDown"), Method(game, "ProcessSpecialKeys_KeyUp"), Method(mission, "OnKeyUp"),
                     Method(Type("ZX.Components.CLife"), "#=zG9K55tU="), Method(Type("ZX.Components.CLife"), "#=z9SDftOMfXc1$"),
                     Method(world, Compatibility.ShowWorld), Method(world, "OnDispose"),
-                    Method(closure, Compatibility.StartMission), Method(game, Compatibility.Options)
+                    Method(closure, Compatibility.StartMission), Method(game, Compatibility.Options),
+                    Method(mission, "#=zEHnEwyMK7mIMOOClaw==")
                 };
                 harmony.Patch(targets[0], prefix: Hook(nameof(Command)));
                 harmony.Patch(targets[1], prefix: Hook(nameof(KeyDown)));
@@ -175,6 +176,7 @@ namespace TABQoL
                 harmony.Patch(targets[7], prefix: Hook(nameof(WorldDisposed)));
                 harmony.Patch(targets[8], prefix: Hook(nameof(StartHero)));
                 harmony.Patch(targets[9], transpiler: Hook(nameof(Options)));
+                harmony.Patch(targets[10], prefix: Hook(nameof(Activate)));
                 Volatile.Write(ref hookState, 2);
                 Log("Steam runtime hooks installed.");
             }
@@ -192,6 +194,10 @@ namespace TABQoL
         }
 
         private static void Command(object __instance) { if (HooksEnabled) Bridge.CommandRefreshing(__instance); }
+        private static bool Activate(object __instance, object[] __args)
+        {
+            return !HooksEnabled || !Bridge.CommandActivating(__instance, __args[0]);
+        }
         private static void WorldShown(object __instance) { if (HooksEnabled) Bridge.WorldShown(__instance); }
         private static void WorldDisposed(object __instance) { if (HooksEnabled) Bridge.WorldDisposed(__instance); }
         private static void OptionsCreated(object window) { if (HooksEnabled) Bridge.OptionsCreated(window); }

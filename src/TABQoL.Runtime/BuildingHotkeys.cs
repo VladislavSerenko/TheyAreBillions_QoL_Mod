@@ -175,17 +175,18 @@ namespace TABQoL
             foreach (var button in buttons)
             {
                 if (!(bool)Reflect.Get(button, "Visible") || KeyFor(button) != key) continue;
-                // The grid's Enabled state can reflect the primary building.
-                // Group training checks every selected producer independently.
-                if (!TryQueueSelected(system, Reflect.Get(button, "Tag")) && (bool)Reflect.Get(button, "Enabled"))
+                // Keyboard and mouse both enter the native activation method.
+                // Its shared hook owns group dispatch, so one key buys once.
+                if ((bool)Reflect.Get(button, "Enabled"))
                     Reflect.Call(system, "#=zEHnEwyMK7mIMOOClaw==", button);
                 return true;
             }
             return false;
         }
 
-        private static bool TryQueueSelected(object system, object command)
+        internal static bool OnActivate(object system, object control)
         {
+            var command = Reflect.Get(control, "Tag");
             if (command == null || command.GetType().FullName != "ZX.Commands.Train") return false;
             bool group = false;
             try
@@ -200,6 +201,9 @@ namespace TABQoL
                     .Where(e => e != null && structure.IsInstanceOfType(e) && Reflect.Get(e, "Team").ToString() == "Player").Distinct().ToList();
                 if (buildings.Count < 2) return false;
                 group = true;
+                // Train has no target. Match the native completion path by
+                // leaving any pending placement or rally-point mode first.
+                Reflect.Call(system, "#=zxEeLa$s1cFWH9gUCClxHkJs=");
                 var unit = (Type)Reflect.Get(command, "EntityType");
                 var target = Activator.CreateInstance(Reflect.Type("ZX.Commands.ZXCommandTarget"));
                 foreach (var building in buildings)
@@ -220,7 +224,7 @@ namespace TABQoL
             catch (Exception ex)
             {
                 // Never replay the native group activation after a partial
-                // purchase. OnKey still consumes this key-down and its release.
+                // purchase, including when every producer is ineligible.
                 Bridge.Log(ex);
             }
             finally
@@ -231,7 +235,7 @@ namespace TABQoL
                     catch (Exception ex) { Bridge.Log(ex); }
                 }
             }
-            return true;
+            return group;
         }
     }
 }

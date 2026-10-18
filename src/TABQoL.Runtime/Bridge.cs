@@ -261,6 +261,16 @@ namespace TABQoL
             catch (Exception ex) { Log(ex); }
         }
 
+        public static bool CommandActivating(object system, object control)
+        {
+            try
+            {
+                if (!initialized || !InMission || !Ready) return false;
+                return BuildingHotkeys.OnActivate(system, control);
+            }
+            catch (Exception ex) { Log(ex); return false; }
+        }
+
         public static bool BuildingKeyDown(object system, int key)
         {
             try

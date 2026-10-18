@@ -52,6 +52,10 @@ namespace TABQoL.Installer
                 var control = module.Types.Single(t => t.FullName == "ZX.GUI.ZXControlCommand");
                 Prefix(Get(control, "#=zwjLekNY="), Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Call, Hook("CommandRefreshing")));
                 var mission = module.Types.Single(t => t.FullName == Symbol(Compatibility.MissionSystem));
+                var activate = Get(mission, "#=zEHnEwyMK7mIMOOClaw==");
+                var activateEntry = activate.Body.Instructions.First();
+                Prefix(activate, Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Ldarg_1), Instruction.Create(OpCodes.Call, Hook("CommandActivating")),
+                    Instruction.Create(OpCodes.Brfalse, activateEntry), Instruction.Create(OpCodes.Ret));
                 var keyDown = Get(mission, "OnKeyDown");
                 var keyEntry = keyDown.Body.Instructions.First();
                 Prefix(keyDown, Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Ldarg_1), Instruction.Create(OpCodes.Call, Hook("BuildingKeyDown")),
@@ -120,7 +124,7 @@ namespace TABQoL.Installer
                     foreach (var nested in type.NestedTypes) Scan(nested);
                 }
                 foreach (var type in module.Types) Scan(type);
-                string[] expected = { "OnFrame", "WorldShown", "WorldDisposed", "TrySkipHero", "OptionsCreated", "CommandRefreshing", "BuildingKeyDown", "IgnoreDamage", "GlobalKeyUp" };
+                string[] expected = { "OnFrame", "WorldShown", "WorldDisposed", "TrySkipHero", "OptionsCreated", "CommandRefreshing", "CommandActivating", "BuildingKeyDown", "IgnoreDamage", "GlobalKeyUp" };
                 if (!hooks.SetEquals(expected)) throw new InvalidDataException("Patched hook verification failed.");
             }
         }

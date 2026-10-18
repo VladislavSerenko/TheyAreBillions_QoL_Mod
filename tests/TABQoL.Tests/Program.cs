@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Xml;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
 using TABQoL;
 using TABQoL.Installer;
 using Installer = TABQoL.Installer.Program;
@@ -71,6 +73,35 @@ internal static class Program
         {
             configField.SetValue(null, previousConfig);
             entriesField.SetValue(null, previousEntries);
+        }
+    }
+
+    private static void CommandActivationTarget(string executable, bool steam, bool patched)
+    {
+        using (var module = ModuleDefMD.Load(executable))
+        {
+            var mission = module.Types.Single(t => t.FullName == Compatibility.Symbol(Compatibility.MissionSystem, steam));
+            var activate = mission.Methods.Single(m => m.Name == Compatibility.Symbol("#=zEHnEwyMK7mIMOOClaw==", steam));
+            Check(!activate.IsStatic && activate.HasBody && activate.MethodSig.RetType.FullName == "System.Void" &&
+                activate.MethodSig.Params.Count == 1 && activate.MethodSig.Params[0].FullName == "ZX.GUI.ZXControlCommand",
+                (steam ? "Steam alias" : "GOG activation") + " resolves to the native instance command-button handler signature");
+            if (steam)
+            {
+                var cancel = mission.Methods.Single(m => m.Name == Compatibility.Symbol("#=zxEeLa$s1cFWH9gUCClxHkJs=", true));
+                Check(!cancel.IsStatic && cancel.HasBody && cancel.MethodSig.RetType.FullName == "System.Void" && cancel.MethodSig.Params.Count == 0,
+                    "Steam targeting-cancellation alias resolves to the native parameterless instance handler");
+            }
+            if (!patched) return;
+
+            activate.Body.SimplifyMacros(activate.Parameters);
+            var body = activate.Body.Instructions;
+            Check(body.Count > 5 && body[0].OpCode == OpCodes.Ldarg && ReferenceEquals(body[0].Operand, activate.Parameters[0]) &&
+                body[1].OpCode == OpCodes.Ldarg && ReferenceEquals(body[1].Operand, activate.Parameters[1]) &&
+                body[2].OpCode == OpCodes.Call && body[2].Operand is IMethod hook &&
+                hook.DeclaringType.FullName == typeof(Bridge).FullName && hook.Name == "CommandActivating" &&
+                hook.MethodSig.RetType.FullName == "System.Boolean" &&
+                body[3].OpCode == OpCodes.Brfalse && ReferenceEquals(body[3].Operand, body[5]) && body[4].OpCode == OpCodes.Ret,
+                "GOG command-button activation consumes a handled group and otherwise enters the original native body");
         }
     }
 
@@ -172,6 +203,12 @@ internal static class Program
             Console.WriteLine(passed + " checks passed.");
             return 0;
         }
+        if (args.Length == 1 && args[0] == "--group-training")
+        {
+            TrainingActivationTests.Run(Check);
+            Console.WriteLine(passed + " checks passed.");
+            return 0;
+        }
         string root = Path.Combine(Path.GetTempPath(), "TABQoL.Tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -203,6 +240,7 @@ internal static class Program
                 Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = 1441 }.Validate()), "autosave interval bounds enforced");
             Check(Policy.GridKey(1) == 'Q' && Policy.GridKey(2) == 'W' && Policy.GridKey(5) == 'T' && Policy.GridKey(6) == 'A' && Policy.GridKey(15) == 'B' && Policy.GridKey(0) == 0, "command grid follows QWERT, ASDFG, ZXCVB");
             BuildingBindingValidation();
+            TrainingActivationTests.Run(Check);
             var schedule = new AutosaveSchedule();
             Check(!schedule.Tick(0, true, 1), "autosave does not fire immediately");
             for (int second = 1; second < 30; second++) schedule.Tick(second, true, 1);
@@ -316,6 +354,7 @@ internal static class Program
                 string prepared = Path.Combine(root, originalHash + "-prepared.exe");
                 if (originalHash == Compatibility.SteamSha256)
                 {
+                    CommandActivationTarget(original, true, false);
                     Check(Throws<InvalidDataException>(() => Patcher.Prepare(original, prepared)) && !File.Exists(prepared) &&
                         SnapshotStore.Hash(original) == originalHash, "Steam EXE rewriting is rejected before creating output");
                     SteamLifecycle(root, original);
@@ -323,9 +362,10 @@ internal static class Program
                 }
                 Patcher.Prepare(original, prepared);
                 Patcher.Verify(prepared);
+                CommandActivationTarget(prepared, false, true);
                 Patcher.VerifyMetadata(original, prepared);
                 Check(true, "original metadata token identities preserved");
-                Check(File.Exists(prepared), "actual " + Compatibility.VersionFor(originalHash) + " patched and all nine hook names verified");
+                Check(File.Exists(prepared), "actual " + Compatibility.VersionFor(originalHash) + " patched and all ten hook names verified");
                 Check(SnapshotStore.Hash(original) == originalHash, "original EXE unchanged");
                 Check(Throws<InvalidDataException>(() => Patcher.Prepare(prepared, Path.Combine(root, "double.exe"))), "double patch rejected");
             }
