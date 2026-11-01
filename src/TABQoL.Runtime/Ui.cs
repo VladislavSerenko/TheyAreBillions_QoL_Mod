@@ -354,17 +354,26 @@ namespace TABQoL
         {
             Close(buildingWindow);
             var entries = BuildingHotkeys.Entries;
-            int pages = Math.Max(1, (entries.Count + 7) / 8);
+            const int pageSize = 7;
+            int pages = Math.Max(1, (entries.Count + pageSize - 1) / pageSize);
             page = Math.Max(0, Math.Min(page, pages - 1));
             var window = Window("Building hotkeys - " + (page + 1) + " / " + pages);
             buildingWindow = window;
             var content = Reflect.Get(window, "OContent");
             float width = (float)Reflect.Get(content, "Width"), u = Unit;
-            Add(content, Label("Auto follows icon rows: QWERT / ASDFG / ZXCVB.\nA-Z: assign key; Backspace: unbind; Esc: cancel.\nCustom keys can repeat in different categories.", width, ContentAlignment.TopCenter), 0, 0, width, 80 * u);
-            int row = 0;
-            foreach (var entry in entries.Skip(page * 8).Take(8))
+            Check(content, "Override building hotkeys", 0, width, Bridge.Config.OverrideBuildingHotkeys, value =>
             {
-                float y = (88 + row++ * 36) * u;
+                bool previous = Bridge.Config.OverrideBuildingHotkeys;
+                Bridge.Config.OverrideBuildingHotkeys = value;
+                try { Bridge.PersistSettings(); }
+                catch { Bridge.Config.OverrideBuildingHotkeys = previous; throw; }
+                BuildingHotkeys.Refresh();
+            });
+            Add(content, Label("Off: native hotkeys; saved bindings are kept.\nAuto follows icon rows: QWERT / ASDFG / ZXCVB.\nA-Z: assign key; Backspace: unbind; Esc: cancel.", width, ContentAlignment.TopCenter), 0, 30 * u, width, 84 * u);
+            int row = 0;
+            foreach (var entry in entries.Skip(page * pageSize).Take(pageSize))
+            {
+                float y = (120 + row++ * 36) * u;
                 Add(content, Label(entry.Category + ": " + entry.Name, width * 0.72f), 0, y, width * 0.72f, 34 * u);
                 object button = null;
                 button = Button(content, BuildingKeyName(entry), width * 0.75f, y, width * 0.23f, () =>

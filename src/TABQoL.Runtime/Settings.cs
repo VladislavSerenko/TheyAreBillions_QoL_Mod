@@ -21,6 +21,7 @@ namespace TABQoL
         public bool HealthBarsVisible { get; set; }
         public int SettingsVersion { get; set; }
         public int AutosaveMinutes { get; set; } = 10;
+        public bool OverrideBuildingHotkeys { get; set; } = true;
         public List<BuildingBinding> BuildingKeys { get; set; } = new List<BuildingBinding>();
 
         public int[] GlobalKeys() { return new[] { QuickSaveKey, QuickLoadKey, SlowerKey, FasterKey, MenuKey, CheatsKey, HealthBarsKey }; }

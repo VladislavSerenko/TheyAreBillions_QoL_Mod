@@ -10,7 +10,7 @@ needed. Follow the [installation steps](#install-steam-and-gog) below.
 
 ## Supported versions
 
-Version 0.3.4 supports **Steam and GOG x64** for the exact builds below.
+Version 0.3.5 supports **Steam and GOG x64** for the exact builds below.
 See [tested behavior and limits](VALIDATION.md). The installer detects the
 edition from the original `TheyAreBillions.exe` SHA-256:
 
@@ -28,7 +28,7 @@ normally with its own dependencies installed.
 
 ## Install (Steam and GOG)
 
-Download the ready-to-install **`TABQoL-0.3.4.zip`** from
+Download the ready-to-install **`TABQoL-0.3.5.zip`** from
 [Releases](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/releases),
 under **Assets**. The **Source code** archives and **Code > Download ZIP** contain
 project source files without the ready-to-run installer.
@@ -36,8 +36,8 @@ project source files without the ready-to-run installer.
 If no release is listed yet, download the current build from
 [Actions > Build and test](https://github.com/VladislavSerenko/TheyAreBillions_QoL_Mod/actions/workflows/build.yml?query=branch%3Amain).
 Sign in to GitHub, open the latest successful run on **main**, scroll to
-**Artifacts**, and download **TABQoL-0.3.4**. This download may contain another
-`TABQoL-0.3.4.zip`; extract that ZIP too.
+**Artifacts**, and download **TABQoL-0.3.5**. This download may contain another
+`TABQoL-0.3.5.zip`; extract that ZIP too.
 
 1. **Close the game.** Extract all files into a separate folder. You should see
    `TABQoL.Installer.exe` alongside the included DLL files. Keep them together.
@@ -148,6 +148,15 @@ indefinitely. A different mission, interval change or game restart starts a
 fresh countdown; missed saves during a long suspension are not queued.
 
 ### Building hotkeys
+
+Open **F11 > Building hotkeys** or **Options > TAB QoL > Building hotkeys** and
+uncheck **Override building hotkeys** to use the game's native controls,
+including your camera and attack bindings. The change applies immediately and
+persists between sessions. Custom building bindings are kept for re-enabling
+the override later. Other QoL features, including group recruitment, remain
+available. The override defaults to on for both new and existing settings.
+
+When **Override building hotkeys** is enabled:
 
 Select a player building and use **Q W E R T** for its top command row,
 **A S D F G** for the middle row, and **Z X C V B** for the bottom row.
@@ -272,8 +281,8 @@ On Windows with the .NET SDK 8 or newer:
 
 The release ZIP is written to `artifacts`. NuGet restores dnlib 4.5.0,
 Lib.Harmony 2.4.1 and .NET Framework reference assemblies. No game assemblies
-are required to compile. The clean **0.3.3** build passes **130 checks with both
-supported originals supplied**; **100 checks** do not require game files.
+are required to compile. The clean **0.3.5** build passes **138 checks with both
+supported originals supplied**; **108 checks** do not require game files.
 Native verification is tracked in [VALIDATION.md](VALIDATION.md). The checks cover settings,
 autosave timing, command-grid mapping, slot isolation/retention, checksum
 rejection, interrupted writes and startup config preservation. With

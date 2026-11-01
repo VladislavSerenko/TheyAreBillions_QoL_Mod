@@ -76,6 +76,53 @@ internal static class Program
         }
     }
 
+    private sealed class BuildingControlFixture
+    {
+        public int FixedKey { get; set; }
+    }
+
+    private sealed class BuildingHintFixture
+    {
+        public bool Visible { get; set; }
+    }
+
+    private static void DisabledBuildingHotkeys()
+    {
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+        var configField = typeof(Bridge).GetField("Config", flags);
+        var initializedField = typeof(Bridge).GetField("initialized", flags);
+        var hotkeys = typeof(Bridge).Assembly.GetType("TABQoL.BuildingHotkeys", true);
+        var hints = (System.Runtime.CompilerServices.ConditionalWeakTable<object, object>)hotkeys.GetField("hints", flags).GetValue(null);
+        var ui = typeof(Bridge).Assembly.GetType("TABQoL.Ui", true);
+        var captureField = ui.GetField("CaptureKey", flags);
+        object previousConfig = configField.GetValue(null), previousInitialized = initializedField.GetValue(null), previousCapture = captureField.GetValue(null);
+        var control = new BuildingControlFixture { FixedKey = 'T' };
+        var hint = new BuildingHintFixture { Visible = true };
+        try
+        {
+            configField.SetValue(null, new Settings { OverrideBuildingHotkeys = false });
+            initializedField.SetValue(null, true);
+            captureField.SetValue(null, null);
+            hints.Add(control, hint);
+            hotkeys.GetMethod("UpdateControl", flags).Invoke(null, new object[] { control });
+            Check(control.FixedKey == 'T' && !hint.Visible, "disabled building override preserves native command keys and hides QoL hints");
+            Check(!(bool)hotkeys.GetMethod("OnKey", flags).Invoke(null, new object[] { null, (int)'W' }),
+                "disabled building override bypasses command dispatch without accessing game state");
+            Check(!Bridge.BuildingKeyDown(null, 'W') && !Bridge.BuildingKeyDown(null, 'Z') && !Bridge.GlobalKeyUp(null, 'W') && !Bridge.GlobalKeyUp(null, 'Z'),
+                "disabled building override forwards camera and attack keys to native handlers");
+            Check(Bridge.BuildingKeyDown(null, 122), "disabled building override keeps the QoL menu shortcut reserved");
+            captureField.SetValue(null, (Action<int>)(_ => { }));
+            Check(Bridge.BuildingKeyDown(null, 'W'), "key capture still consumes keys while the building override is off");
+        }
+        finally
+        {
+            hints.Remove(control);
+            configField.SetValue(null, previousConfig);
+            initializedField.SetValue(null, previousInitialized);
+            captureField.SetValue(null, previousCapture);
+        }
+    }
+
     private static void CommandActivationTarget(string executable, bool steam, bool patched)
     {
         using (var module = ModuleDefMD.Load(executable))
@@ -251,6 +298,8 @@ internal static class Program
             Check(settings.CheatsKey == 123 && settings.MenuKey == 122 && settings.AutosaveMinutes == 10 && settings.BuildingKeys.Count == 0 && settings.Speed == 2, "old defaults migrate to F11 and ten-minute autosaves");
             File.WriteAllText(settingsPath, "<Settings><MenuKey>117</MenuKey><Speed>1</Speed></Settings>");
             Check(Settings.Read(settingsPath).MenuKey == 117, "custom menu binding survives migration");
+            Check(new Settings().OverrideBuildingHotkeys && Settings.Read(settingsPath).OverrideBuildingHotkeys,
+                "building override remains enabled for new and legacy settings");
             Check(settings.HealthBarsKey == 119 && !settings.HealthBarsVisible && settings.GlobalKeys().Length == 7,
                 "health bars default to an independent F8 toggle without enabling the display");
             File.WriteAllText(settingsPath, "<Settings><SettingsVersion>3</SettingsVersion><MenuKey>119</MenuKey></Settings>");
@@ -270,6 +319,7 @@ internal static class Program
                 Throws<InvalidDataException>(() => new Settings { AutosaveMinutes = 1441 }.Validate()), "autosave interval bounds enforced");
             Check(Policy.GridKey(1) == 'Q' && Policy.GridKey(2) == 'W' && Policy.GridKey(5) == 'T' && Policy.GridKey(6) == 'A' && Policy.GridKey(15) == 'B' && Policy.GridKey(0) == 0, "command grid follows QWERT, ASDFG, ZXCVB");
             BuildingBindingValidation();
+            DisabledBuildingHotkeys();
             TrainingActivationTests.Run(Check);
             AutosaveReloadTests.Run(Check);
             var schedule = new AutosaveSchedule();
@@ -287,6 +337,15 @@ internal static class Program
             settings.BuildingKeys.Add(new BuildingBinding { EntityType = "ZX.Entities.TentHouse", Key = 84 });
             settings.Write(settingsPath);
             Check(Settings.Read(settingsPath).BuildingKeys[0].Key == 84, "building overrides round trip");
+            settings.OverrideBuildingHotkeys = false;
+            settings.Write(settingsPath);
+            var nativeHotkeys = Settings.Read(settingsPath);
+            Check(!nativeHotkeys.OverrideBuildingHotkeys && nativeHotkeys.BuildingKeys[0].Key == 84 && nativeHotkeys.MenuKey == settings.MenuKey,
+                "disabled building override persists without losing custom bindings or other QoL keys");
+            nativeHotkeys.OverrideBuildingHotkeys = true;
+            nativeHotkeys.Write(settingsPath);
+            Check(Settings.Read(settingsPath).OverrideBuildingHotkeys && Settings.Read(settingsPath).BuildingKeys[0].Key == 84,
+                "building override can be re-enabled with its saved custom binding");
             settings.MenuKey = 84;
             Check(Throws<InvalidDataException>(settings.Validate), "building and global hotkey conflict rejected");
             settings = new Settings { CheatsKey = 116 };

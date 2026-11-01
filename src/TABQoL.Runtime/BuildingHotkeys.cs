@@ -82,7 +82,7 @@ namespace TABQoL
         internal static void UpdateControl(object control)
         {
             if (Bridge.Config == null) return;
-            ApplyKey(control, SelectedStructure() && (bool)Reflect.Get(control, "Visible") ? KeyFor(control) : 0);
+            ApplyKey(control, Bridge.Config.OverrideBuildingHotkeys && SelectedStructure() && (bool)Reflect.Get(control, "Visible") ? KeyFor(control) : 0);
         }
 
         private static void ApplyKey(object control, int key)
@@ -167,7 +167,7 @@ namespace TABQoL
 
         internal static bool OnKey(object system, int key)
         {
-            if (!Bridge.InMission || !Bridge.Ready || Ui.CaptureKey != null || Bridge.HasModifier || !SelectedStructure() ||
+            if (Bridge.Config == null || !Bridge.Config.OverrideBuildingHotkeys || !Bridge.InMission || !Bridge.Ready || Ui.CaptureKey != null || Bridge.HasModifier || !SelectedStructure() ||
                 (bool)Reflect.Get(Reflect.Type("DXVision.GUI.DXModalScreen"), "IsInModal")) return false;
             var grid = Reflect.Field(system, Grid);
             if (grid == null || !(bool)Reflect.Get(Reflect.Get(grid, "ScnObject"), "Visible")) return false;

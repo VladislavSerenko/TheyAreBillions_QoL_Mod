@@ -1,4 +1,44 @@
-# Validation — 0.3.4
+# Validation — 0.3.5
+
+## 0.3.5 verification
+
+The Building hotkeys page now has a persistent **Override building hotkeys**
+checkbox. Disabling it stops the QoL command-key override and hides its hints;
+refreshing the command panel restores native keys immediately. Saved custom
+bindings are retained, and the default remains enabled for existing settings.
+Group recruitment and other QoL features remain independent of this option.
+
+The clean build passes **138 checks with both supported original executables
+supplied**, with **zero warnings and errors**. **108 checks** run without game
+files. New coverage checks default/legacy settings, disabling and re-enabling
+across XML reloads, preservation of custom bindings, native key forwarding,
+hint removal and continued QoL shortcut/key-capture handling. Native Steam
+verification is recorded below. This option has not been play-tested on GOG.
+
+### Native Steam comparison on 2026-11-01
+
+Two launches used the same existing, paused TABQoL07Steam test mission and
+the player's Custom keyboard layout. The control launch used the exact
+original startup config: neither TABQoL.Runtime.dll nor 0Harmony.dll was
+loaded, and no new mod startup log entries appeared. The installed mod config
+was restored byte for byte as soon as the native game window appeared.
+
+In the control launch, Enter selected the command center and C opened Colonists.
+Tent showed no keyboard shortcut in its native tooltip; neither Q nor T
+entered placement. With the mod loaded and the override off, the same steps
+produced the same result. Enabling the checkbox made the saved QoL Q binding
+enter Tent placement. Placement was cancelled without constructing anything.
+After disabling the checkbox again, the Colonists tooltip displayed its
+native C binding and the extra grid-key labels were hidden. The direct Tent
+comparison above used the separately verified launch with the override off.
+
+Screenshots capture the clean control, restored native controls and the
+checkbox states. Both test processes were closed without saving. All existing
+native save/checksum files and the pre-toggle Settings.xml hashes were
+unchanged. No resets or cheats were used; the original Steam EXE and installed
+mod files passed installer inspection afterward. The game was left closed.
+This comparison covers the stated build, mission, layout and commands; it
+does not establish historical behavior of every building or other game builds.
 
 ## 0.3.4 documentation update
 
@@ -6,7 +46,7 @@ The README and installation documentation are now English only. The Russian
 README and its links have been removed from the repository and release
 packages. Packaging checks verify the installer and source archive contents.
 
-Runtime and installer source code are identical to 0.3.3; its automated and
+The published 0.3.4 runtime and installer source match 0.3.3; its automated and
 native verification is recorded below. Version references and documentation
 packaging are the only changes in this release.
 
